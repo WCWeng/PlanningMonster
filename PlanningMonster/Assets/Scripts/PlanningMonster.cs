@@ -1,5 +1,5 @@
 ﻿// Planning Monster: a motion planning project of GRA class
-// Weng, Wei-Chen 2017/11/15
+// Weng, Wei-Chen 2017/11/21
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -39,7 +39,6 @@ public class PlanningMonster : MonoBehaviour
     Vector3 backgroundOffset;
     Vector3 moveOffset;
     Vector3 rotateStartVector;
-    Vector3 rotateStartVectorTemp;
     Vector3 rotateCurrVector;
 
     //-------------struct-------------
@@ -86,67 +85,9 @@ public class PlanningMonster : MonoBehaviour
         print("Screen width: " + Screen.width + ", height: " + Screen.height);
         print("Background Size: " + backgroundSize);
 
-        // Read data
-        readDat(Application.streamingAssetsPath + "/robot.dat", robotDat);
-        readDat(Application.streamingAssetsPath + "/obstacles.dat", obstaclesDat);
+        // Load data
+        loadData();
 
-        // Create background, robots & obstacles data structure
-        bgCreate();
-        robotCreate();
-        obstaclesCreate();
-
-        // Add scale & offset
-        for (int rob = 0; rob < robot.GetLength(0); rob++)  // robot
-        {
-            for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
-            {
-                for (int i = 0; i < robot[rob].polygon[poly].vertices.GetLength(0); i++)
-                {
-                    robot[rob].polygon[poly].vertices[i] *= scale;
-                    robot[rob].polygon[poly].vertices[i] += backgroundOffset;
-                }
-            }
-        }
-        for (int obs = 0; obs < obstacles.GetLength(0); obs++)  // obstacle
-        {
-            for (int poly = 0; poly < obstacles[obs].numberOfPolygon; poly++)
-            {
-                for (int i = 0; i < obstacles[obs].polygon[poly].vertices.GetLength(0); i++)
-                {
-                    obstacles[obs].polygon[poly].vertices[i] *= scale;
-                    obstacles[obs].polygon[poly].vertices[i] += backgroundOffset;
-                }
-            }
-        }
-
-        // Draw robots & obstacles
-        for (int rob = 0; rob < robot.GetLength(0); rob++)  // robot
-        {
-            GameObject parentRobot = new GameObject();
-            parentRobot.name = "robot" + rob;
-            deleteList.Add(parentRobot.name);
-            parentRobot.transform.position = mainCamera.ScreenToWorldPoint(robot[rob].initial.position * scale + backgroundOffset);
-            for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
-            {
-                drawPolygon(robot[rob].polygon[poly].vertices, parentRobot, robotMaterial, parentRobot.name + "polygon" + poly);
-            }
-            parentRobot.transform.Rotate(new Vector3(0, 0, 1), robot[rob].initial.rotation, Space.Self);
-        }
-        for (int obs = 0; obs < obstacles.GetLength(0); obs++)  // obstacle
-        {
-            GameObject parentObstacle = new GameObject();
-            parentObstacle.name = "obstacle" + obs;
-            deleteList.Add(parentObstacle.name);
-            parentObstacle.transform.position = mainCamera.ScreenToWorldPoint(obstacles[obs].initial.position * scale + backgroundOffset);
-            for (int poly = 0; poly < obstacles[obs].numberOfPolygon; poly++)
-            {
-                drawPolygon(obstacles[obs].polygon[poly].vertices, parentObstacle, obsMaterial, parentObstacle.name + "polygon" + poly);
-            }
-            parentObstacle.transform.Rotate(new Vector3(0, 0, 1), obstacles[obs].initial.rotation, Space.Self);
-        }
-
-        // Write back vertices
-        writeBackVertices();
     }
 
     // Update is called once per frame
@@ -186,12 +127,11 @@ public class PlanningMonster : MonoBehaviour
             if (hit)
             {
                 //Debug.Log("Hit " + hitInfo.transform.parent.gameObject.name);
-                if (!moving) // First hit: decide start vector
+                if (!moving) // First hit: decide selectedPoly
                 {
                     selectedPoly = GameObject.Find(hitInfo.transform.parent.gameObject.name);
                     mouseStartPosition = new Vector3(Input.mousePosition.x, Input.mousePosition.y, objDepth);
                     rotateStartVector = (mouseStartPosition - mainCamera.WorldToScreenPoint(selectedPoly.transform.position)).normalized;
-                    rotateStartVectorTemp = rotateStartVector;
 
                     moving = true;
                 }
@@ -203,25 +143,122 @@ public class PlanningMonster : MonoBehaviour
             if (moving)
             {
                 mouseCurrPosition = new Vector3(Input.mousePosition.x, Input.mousePosition.y, objDepth);
-                rotateCurrVector = (mouseCurrPosition - mainCamera.WorldToScreenPoint(selectedPoly.transform.position)).normalized;
+                rotateCurrVector = (mouseCurrPosition - mainCamera.WorldToScreenPoint(selectedPoly.transform.position));
 
-                float rotateAngle = Vector3.Angle(rotateStartVectorTemp, rotateCurrVector);
-                Vector3 getDirect = Vector3.Cross(rotateStartVectorTemp, rotateCurrVector).normalized;
+                float rotateAngle = Vector3.Angle(rotateStartVector, rotateCurrVector);
+                Vector3 getDirect = Vector3.Cross(rotateStartVector, rotateCurrVector).normalized;
                 if (getDirect.z < 0)
                     rotateAngle = -rotateAngle;
                 selectedPoly.transform.Rotate(new Vector3(0, 0, 1), rotateAngle, Space.Self);
-                rotateStartVectorTemp = rotateCurrVector;
+                rotateStartVector = rotateCurrVector;
+                /*float rotateAngle = Vector3.Angle(new Vector3(1, 0, 0), rotateCurrVector);
+                Vector3 direction = Vector3.Cross(new Vector3(1, 0, 0), rotateCurrVector);
+                if (direction.z < 0)
+                {
+                    rotateAngle = -rotateAngle + 360.0f;
+                }
+                if (rotateAngle >= 360.0f)
+                    rotateAngle -= 360.0f;
+                selectedPoly.transform.rotation = Quaternion.Euler(0, 0, rotateAngle);*/
             }
         }
-        if (Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(1))
+        if (Input.GetMouseButtonUp(0))
         {
+            //  Write back translate
             if (moving)
             {
-                writeBackVertices();
+                string[] selected = selectedPoly.name.Split(' ');
+                Vector3 translate = (mouseCurrPosition - mouseStartPosition) / scale;
+
+                if (selected[0] == "robot")
+                    robot[Int32.Parse(selected[1])].initial.position += translate;
+                if (selected[0] == "obstacle")
+                    obstacles[Int32.Parse(selected[1])].initial.position += translate;
+
+                myBug();
             }
 
             moving = false;
         }
+        if (Input.GetMouseButtonUp(1))
+        {
+            if (moving)
+            {
+                //  Write back rorate
+                string[] selected = selectedPoly.name.Split(' ');
+
+                if (selected[0] == "robot")
+                    robot[Int32.Parse(selected[1])].initial.rotation = selectedPoly.transform.rotation.eulerAngles.z;
+                if (selected[0] == "obstacle")
+                    obstacles[Int32.Parse(selected[1])].initial.rotation = selectedPoly.transform.rotation.eulerAngles.z;
+
+                myBug();
+            }
+
+            moving = false;
+        }
+    }
+
+    public void loadData()
+    {
+        // Remove polygon & background
+        for (int i = 0; i < deleteList.Count; i++)
+            Destroy(GameObject.Find(deleteList[i]));
+        if (GameObject.Find("Background"))
+            Destroy(GameObject.Find("Background"));
+        deleteList.Clear();
+
+        // Read data
+        readDat(Application.streamingAssetsPath + "/robot.dat", robotDat);
+        readDat(Application.streamingAssetsPath + "/obstacles.dat", obstaclesDat);
+
+        // Create background, robots & obstacles data structure
+        bgCreate();
+        robotCreate();
+        obstaclesCreate();
+
+        // Draw robots & obstacles
+        for (int rob = 0; rob < robot.GetLength(0); rob++)  // robot
+        {
+            GameObject parentRobot = new GameObject();
+            parentRobot.name = "robot " + rob;
+            deleteList.Add(parentRobot.name);
+            parentRobot.transform.position = mainCamera.ScreenToWorldPoint(robot[rob].initial.position * scale + backgroundOffset);
+            for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
+            {
+                Vector3[] vertices = new Vector3[robot[rob].polygon[poly].numberOfVertices];
+                // Load initial configuration
+                for (int ver = 0; ver < robot[rob].polygon[poly].numberOfVertices; ver++)
+                {
+                    vertices[ver].x = robot[rob].polygon[poly].vertices[ver].x + robot[rob].initial.position.x;
+                    vertices[ver].y = robot[rob].polygon[poly].vertices[ver].y + robot[rob].initial.position.y;
+                    vertices[ver].z = robot[rob].polygon[poly].vertices[ver].z;
+                }
+                drawPolygon(vertices, parentRobot, robotMaterial, parentRobot.name + " polygon " + poly);
+            }
+            parentRobot.transform.Rotate(new Vector3(0, 0, 1), robot[rob].initial.rotation, Space.Self);
+        }
+        for (int obs = 0; obs < obstacles.GetLength(0); obs++)  // obstacle
+        {
+            GameObject parentObstacle = new GameObject();
+            parentObstacle.name = "obstacle " + obs;
+            deleteList.Add(parentObstacle.name);
+            parentObstacle.transform.position = mainCamera.ScreenToWorldPoint(obstacles[obs].initial.position * scale + backgroundOffset);
+            for (int poly = 0; poly < obstacles[obs].numberOfPolygon; poly++)
+            {
+                Vector3[] vertices = new Vector3[obstacles[obs].polygon[poly].numberOfVertices];
+                // Load initial configuration
+                for (int ver = 0; ver < obstacles[obs].polygon[poly].numberOfVertices; ver++)
+                {
+                    vertices[ver].x = obstacles[obs].polygon[poly].vertices[ver].x + obstacles[obs].initial.position.x;
+                    vertices[ver].y = obstacles[obs].polygon[poly].vertices[ver].y + obstacles[obs].initial.position.y;
+                    vertices[ver].z = obstacles[obs].polygon[poly].vertices[ver].z;
+                }
+                drawPolygon(vertices, parentObstacle, obsMaterial, parentObstacle.name + " polygon " + poly);
+            }
+            parentObstacle.transform.Rotate(new Vector3(0, 0, 1), obstacles[obs].initial.rotation, Space.Self);
+        }
+        myBug();
     }
 
     public void readDat(string path, List<string> dat)
@@ -349,17 +386,6 @@ public class PlanningMonster : MonoBehaviour
                 //+ robot[robotCount].controlPoint[controlPointCount].y + ")");
             }
         }
-        // Load initial configuration
-        for (int rob = 0; rob < robot.GetLength(0); rob++)
-        {
-            for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
-            {
-                for (int ver = 0; ver < robot[rob].polygon[poly].numberOfVertices; ver++)
-                {
-                    robot[rob].polygon[poly].vertices[ver] += robot[rob].initial.position;
-                }
-            }
-        }
     }
 
     public void obstaclesCreate()
@@ -400,24 +426,20 @@ public class PlanningMonster : MonoBehaviour
             obstacles[obstaclesCount].initial.rotation = Convert.ToSingle(initialSplit[2]);
             //print(obstacles[obstaclesCount].initial.position.x + ", " + obstacles[obstaclesCount].initial.position.y + ", " + obstacles[obstaclesCount].initial.rotation);
         }
-        // Load initial configuration
-        for (int obs = 0; obs < obstacles.GetLength(0); obs++)
-        {
-            for (int poly = 0; poly < obstacles[obs].numberOfPolygon; poly++)
-            {
-                for (int ver = 0; ver < obstacles[obs].polygon[poly].numberOfVertices; ver++)
-                {
-                    obstacles[obs].polygon[poly].vertices[ver] += obstacles[obs].initial.position;
-                }
-            }
-        }
     }
 
-    public void drawPolygon(Vector3[] verticesSource, GameObject parentPoly, Material mate, string name)
+    public void drawPolygon(Vector3[] vertices, GameObject parentPoly, Material mate, string name)
     {
-        Vector3[] vertices = new Vector3[verticesSource.GetLength(0)];
+        // Add scale & offset
         for (int i = 0; i < vertices.GetLength(0); i++)
-            vertices[i] = mainCamera.ScreenToWorldPoint(verticesSource[i]);
+        {
+            vertices[i] *= scale;
+            vertices[i] += backgroundOffset;
+        }
+
+        // Space transform
+        for (int i = 0; i < vertices.GetLength(0); i++)
+            vertices[i] = mainCamera.ScreenToWorldPoint(vertices[i]);
 
         // UV
         Vector2[] UV = new Vector2[vertices.Length];
@@ -456,7 +478,7 @@ public class PlanningMonster : MonoBehaviour
         polyGO.transform.parent = parentPoly.transform;
     }
 
-    void writeBackVertices()
+    /*void writeBackInitial()
     {
         for (int rob = 0; rob < robot.GetLength(0); rob++)
         {
@@ -482,22 +504,17 @@ public class PlanningMonster : MonoBehaviour
                 obstacles[obs].polygon[poly].vertices = vertices;
             }
         }
-        //for (int ver = 0; ver < robot[0].polygon[0].vertices.GetLength(0); ver++)
-        //    print(robot[0].polygon[0].vertices[ver]);
-    }
+    }*/
     //------------------------Calculate------------------------
     public void calculate()
     {
         stopWatch.Reset();
         stopWatch.Start();  // Start timing
 
-        Vector3 startPoint = new Vector3(0, 0, objDepth);
-        Vector3 goalPoint = new Vector3(backgroundSize - 1, backgroundSize - 1, objDepth);
-
         initializeBitmap();
         drawObstacles();
-        NFOne();
-        //scanLine(startPoint, goalPoint);
+        for (int cp = 0; cp < 2; cp++)
+            NFOne(cp);
 
         stopWatch.Stop();   // End timing
         TimeSpan ts = stopWatch.Elapsed;
@@ -531,37 +548,91 @@ public class PlanningMonster : MonoBehaviour
                     {
                         int xTex = (int)(x - backgroundOffset.x) / scale;
                         int yTex = (int)(y - backgroundOffset.y) / scale;
-                        pfTexture[0].SetPixel(xTex, yTex, Color.black);
-                        //pfTexture[0].SetPixel(xTex, yTex, new Color(255.0f/255.0f, 255.0f/255.0f, 255.0f/255.0f));
+                        //pfTexture[0].SetPixel(xTex, yTex, Color.black);
+                        pfTexture[0].SetPixel(xTex, yTex, new Color(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f));
                         pfTexture[0].Apply();
-                        pfTexture[1].SetPixel(xTex, yTex, Color.black);
-                        //pfTexture[1].SetPixel(xTex, yTex, new Color(255.0f/255.0f, 255.0f/255.0f, 255.0f/255.0f));
+                        //pfTexture[1].SetPixel(xTex, yTex, Color.black);
+                        pfTexture[1].SetPixel(xTex, yTex, new Color(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f));
                         pfTexture[1].Apply();
                     }
                 }
             }
     }
 
-    void NFOne()
+    void NFOne(int cp)
     {
-        int[,] calculateArray = new int[backgroundSize, backgroundSize];
+        int[,] U = new int[backgroundSize, backgroundSize];
+        List<List<Vector2>> list = new List<List<Vector2>>();
 
+        // Initialize U
         for (int y = 0; y < backgroundSize; y++)
             for (int x = 0; x < backgroundSize; x++)
             {
-                if (pfTexture[0].GetPixel(x, y) == new Color(254.0f / 255.0f, 254.0f / 255.0f, 254.0f / 255.0f))
+                // Assign obstacles to U from pftexture
+                if (pfTexture[cp].GetPixel(x, y) == new Color(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f))
                 {
-                    calculateArray[x, y] = Int32.MaxValue;
+                    U[x, y] = 255;
+                }
+                // Set free space in U to Int32.MaxValue
+                if (pfTexture[cp].GetPixel(x, y) == new Color(254.0f / 255.0f, 254.0f / 255.0f, 254.0f / 255.0f))
+                {
+                    U[x, y] = Int32.MaxValue;
                 }
             }
 
+        // Insert goal in list
+        List<Vector2> listQ = new List<Vector2>();
         for (int rob = 0; rob < robot.GetLength(0); rob++)
-            calculateArray[(int)robot[rob].goal.position.x, (int)robot[rob].goal.position.y] = 0;
-
-        while()
         {
-
+            U[(int)(robot[rob].goal.position.x + robot[rob].controlPoint[cp].x), (int)(robot[rob].goal.position.y + robot[rob].controlPoint[cp].y)] = 0;
+            listQ.Add(new Vector2(robot[rob].goal.position.x + robot[rob].controlPoint[cp].x, robot[rob].goal.position.y + robot[rob].controlPoint[cp].y));
         }
+        list.Add(listQ);
+
+        // Calculate on U
+        int i = 0;
+        while (list[i].Count != 0)
+        {
+            List<Vector2> listQtemp = new List<Vector2>();
+            for (int qi = 0; qi < list[i].Count; qi++)
+            {
+                if ((list[i][qi].x + 1) < backgroundSize)
+                    if (U[(int)(list[i][qi].x + 1), (int)list[i][qi].y] == Int32.MaxValue)  // right neighbor
+                    {
+                        U[(int)(list[i][qi].x + 1), (int)list[i][qi].y] = i + 1;
+                        listQtemp.Add(new Vector2((list[i][qi].x + 1), list[i][qi].y));
+                    }
+                if ((list[i][qi].y + 1) < backgroundSize)
+                    if (U[(int)list[i][qi].x, (int)(list[i][qi].y + 1)] == Int32.MaxValue)  // up neighbor
+                    {
+                        U[(int)list[i][qi].x, (int)(list[i][qi].y + 1)] = i + 1;
+                        listQtemp.Add(new Vector2(list[i][qi].x, (list[i][qi].y + 1)));
+                    }
+                if ((list[i][qi].x - 1) >= 0)
+                    if (U[(int)(list[i][qi].x - 1), (int)list[i][qi].y] == Int32.MaxValue)  // left neighbor
+                    {
+                        U[(int)(list[i][qi].x - 1), (int)list[i][qi].y] = i + 1;
+                        listQtemp.Add(new Vector2((list[i][qi].x - 1), list[i][qi].y));
+                    }
+                if ((list[i][qi].y - 1) >= 0)
+                    if (U[(int)list[i][qi].x, (int)(list[i][qi].y - 1)] == Int32.MaxValue)  // down neighbor
+                    {
+                        U[(int)list[i][qi].x, (int)(list[i][qi].y - 1)] = i + 1;
+                        listQtemp.Add(new Vector2(list[i][qi].x, (list[i][qi].y - 1)));
+                    }
+            }
+            list.Add(listQtemp);
+            i++;
+        }
+
+        // Assign U back to pfTexture
+        for (int y = 0; y < backgroundSize; y++)
+            for (int x = 0; x < backgroundSize; x++)
+            {
+                float color = (float)U[x, y] / i;
+                pfTexture[cp].SetPixel(x, y, new Color(color, color, color));
+                pfTexture[cp].Apply();
+            }
     }
 
     void scanLine(Vector3 startPoint, Vector3 goalPoint)
@@ -582,80 +653,22 @@ public class PlanningMonster : MonoBehaviour
     }
 
     //------------------------Button------------------------
-    public void dropdownData()
+    public void startMoving()
     {
-        // Remove polygon & background
-        for (int i = 0; i < deleteList.Count; i++)
-            Destroy(GameObject.Find(deleteList[i]));
-        Destroy(GameObject.Find("Background"));
-        deleteList.Clear();
 
-        // Read data
-        readDat(Application.streamingAssetsPath + "/robot.dat", robotDat);
-        readDat(Application.streamingAssetsPath + "/obstacles.dat", obstaclesDat);
-
-        // Create background, robots & obstacles data structure
-        bgCreate();
-        robotCreate();
-        obstaclesCreate();
-
-        // Add scale & offset
-        for (int rob = 0; rob < robot.GetLength(0); rob++)  // robot 
-        {
-            for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
-            {
-                for (int i = 0; i < robot[rob].polygon[poly].vertices.GetLength(0); i++)
-                {
-                    robot[rob].polygon[poly].vertices[i] *= scale;
-                    robot[rob].polygon[poly].vertices[i] += backgroundOffset;
-                }
-            }
-        }
-        for (int obs = 0; obs < obstacles.GetLength(0); obs++)  // obstacle
-        {
-            for (int poly = 0; poly < obstacles[obs].numberOfPolygon; poly++)
-            {
-                for (int i = 0; i < obstacles[obs].polygon[poly].vertices.GetLength(0); i++)
-                {
-                    obstacles[obs].polygon[poly].vertices[i] *= scale;
-                    obstacles[obs].polygon[poly].vertices[i] += backgroundOffset;
-                }
-            }
-        }
-
-        // Draw robots & obstacles
-        for (int rob = 0; rob < robot.GetLength(0); rob++)  // robot
-        {
-            GameObject parentRobot = new GameObject();
-            parentRobot.name = "robot" + rob;
-            deleteList.Add(parentRobot.name);
-            parentRobot.transform.position = mainCamera.ScreenToWorldPoint(robot[rob].polygon[0].vertices[0]);
-            for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
-            {
-                drawPolygon(robot[rob].polygon[poly].vertices, parentRobot, robotMaterial, parentRobot.name + "polygon" + poly);
-            }
-        }
-        for (int obs = 0; obs < obstacles.GetLength(0); obs++)  // obstacle
-        {
-            GameObject parentObstacle = new GameObject();
-            parentObstacle.name = "obstacle" + obs;
-            deleteList.Add(parentObstacle.name);
-            parentObstacle.transform.position = mainCamera.ScreenToWorldPoint(obstacles[obs].polygon[0].vertices[0]);
-            for (int poly = 0; poly < obstacles[obs].numberOfPolygon; poly++)
-            {
-                drawPolygon(obstacles[obs].polygon[poly].vertices, parentObstacle, obsMaterial, parentObstacle.name + "polygon" + poly);
-            }
-        }
     }
 
-    public void mainTex()   // backgroundTexture
+    public void backgroundTex()   // backgroundTexture
     {
         GameObject.Find("Background").GetComponent<MeshRenderer>().material.mainTexture = backgroundTexture;
     }
 
-    public void pathTex()   // pathTexture
+    public void pathTex()   // switch backgroundTexture & pathTexture
     {
-        GameObject.Find("Background").GetComponent<MeshRenderer>().material.mainTexture = pathTexture;
+        if (GameObject.Find("Background").GetComponent<MeshRenderer>().material.mainTexture == pathTexture)
+            GameObject.Find("Background").GetComponent<MeshRenderer>().material.mainTexture = backgroundTexture;
+        else
+            GameObject.Find("Background").GetComponent<MeshRenderer>().material.mainTexture = pathTexture;
     }
 
     public void pfOne()   // pfTexture[0]
@@ -668,4 +681,13 @@ public class PlanningMonster : MonoBehaviour
         GameObject.Find("Background").GetComponent<MeshRenderer>().material.mainTexture = pfTexture[1];
     }
     //------------------------end of code------------------------
+    void myBug()
+    {
+        for (int i = 0; i < robot[0].polygon[0].vertices.GetLength(0); i++)
+        {
+            print("robot[0].polygon[0].vertices[i]: " + robot[0].polygon[0].vertices[i]);
+        }
+        print("robot[0].initial.position: " + robot[0].initial.position);
+        print("robot[0].initial.rotation: " + robot[0].initial.rotation);
+    }
 }
