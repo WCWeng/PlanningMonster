@@ -1,5 +1,5 @@
 ﻿// Planning Monster: a motion planning project of GRA class
-// Weng, Wei-Chen 2017/11/21
+// Weng, Wei-Chen 2017/11/29
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,6 +13,7 @@ public class PlanningMonster : MonoBehaviour
     //-------------public-------------
     public Camera mainCamera;
     public Material robotMaterial;
+    public Material goalMaterial;
     public Material obsMaterial;
     public Material bgMaterial;
     public Text calculateTime;
@@ -172,10 +173,10 @@ public class PlanningMonster : MonoBehaviour
 
                 if (selected[0] == "robot")
                     robot[Int32.Parse(selected[1])].initial.position += translate;
+                if (selected[0] == "goal")
+                    robot[Int32.Parse(selected[1])].goal.position += translate;
                 if (selected[0] == "obstacle")
                     obstacles[Int32.Parse(selected[1])].initial.position += translate;
-
-                myBug();
             }
 
             moving = false;
@@ -184,15 +185,15 @@ public class PlanningMonster : MonoBehaviour
         {
             if (moving)
             {
-                //  Write back rorate
+                //  Write back rotation
                 string[] selected = selectedPoly.name.Split(' ');
 
                 if (selected[0] == "robot")
                     robot[Int32.Parse(selected[1])].initial.rotation = selectedPoly.transform.rotation.eulerAngles.z;
+                if (selected[0] == "goal")
+                    robot[Int32.Parse(selected[1])].goal.rotation = selectedPoly.transform.rotation.eulerAngles.z;
                 if (selected[0] == "obstacle")
                     obstacles[Int32.Parse(selected[1])].initial.rotation = selectedPoly.transform.rotation.eulerAngles.z;
-
-                myBug();
             }
 
             moving = false;
@@ -218,7 +219,7 @@ public class PlanningMonster : MonoBehaviour
         obstaclesCreate();
 
         // Draw robots & obstacles
-        for (int rob = 0; rob < robot.GetLength(0); rob++)  // robot
+        for (int rob = 0; rob < robot.GetLength(0); rob++)  // initial robot
         {
             GameObject parentRobot = new GameObject();
             parentRobot.name = "robot " + rob;
@@ -237,6 +238,26 @@ public class PlanningMonster : MonoBehaviour
                 drawPolygon(vertices, parentRobot, robotMaterial, parentRobot.name + " polygon " + poly);
             }
             parentRobot.transform.Rotate(new Vector3(0, 0, 1), robot[rob].initial.rotation, Space.Self);
+        }
+        for (int rob = 0; rob < robot.GetLength(0); rob++)  // goal robot
+        {
+            GameObject parentRobot = new GameObject();
+            parentRobot.name = "goal " + rob;
+            deleteList.Add(parentRobot.name);
+            parentRobot.transform.position = mainCamera.ScreenToWorldPoint(robot[rob].goal.position * scale + backgroundOffset);
+            for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
+            {
+                Vector3[] vertices = new Vector3[robot[rob].polygon[poly].numberOfVertices];
+                // Load goal configuration
+                for (int ver = 0; ver < robot[rob].polygon[poly].numberOfVertices; ver++)
+                {
+                    vertices[ver].x = robot[rob].polygon[poly].vertices[ver].x + robot[rob].goal.position.x;
+                    vertices[ver].y = robot[rob].polygon[poly].vertices[ver].y + robot[rob].goal.position.y;
+                    vertices[ver].z = robot[rob].polygon[poly].vertices[ver].z;
+                }
+                drawPolygon(vertices, parentRobot, goalMaterial, parentRobot.name + " polygon " + poly);
+            }
+            parentRobot.transform.Rotate(new Vector3(0, 0, 1), robot[rob].goal.rotation, Space.Self);
         }
         for (int obs = 0; obs < obstacles.GetLength(0); obs++)  // obstacle
         {
@@ -258,7 +279,6 @@ public class PlanningMonster : MonoBehaviour
             }
             parentObstacle.transform.Rotate(new Vector3(0, 0, 1), obstacles[obs].initial.rotation, Space.Self);
         }
-        myBug();
     }
 
     public void readDat(string path, List<string> dat)
@@ -513,13 +533,14 @@ public class PlanningMonster : MonoBehaviour
 
         initializeBitmap();
         drawObstacles();
-        for (int cp = 0; cp < 2; cp++)
-            NFOne(cp);
+        for (int rob = 0; rob < robot.GetLength(0); rob++)
+            for (int cp = 0; cp < 2; cp++)
+                NFOne(rob, cp);
 
         stopWatch.Stop();   // End timing
         TimeSpan ts = stopWatch.Elapsed;
         string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}", ts.Hours, ts.Minutes, ts.Seconds, ts.Milliseconds / 10);
-        print("Elapsed time: " + elapsedTime);
+        //print("Elapsed time: " + elapsedTime);
         calculateTime.text = elapsedTime;
     }
 
@@ -559,7 +580,7 @@ public class PlanningMonster : MonoBehaviour
             }
     }
 
-    void NFOne(int cp)
+    void NFOne(int rob, int cp)
     {
         int[,] U = new int[backgroundSize, backgroundSize];
         List<List<Vector2>> list = new List<List<Vector2>>();
@@ -582,14 +603,14 @@ public class PlanningMonster : MonoBehaviour
 
         // Insert goal in list
         List<Vector2> listQ = new List<Vector2>();
-        for (int rob = 0; rob < robot.GetLength(0); rob++)
-        {
-            U[(int)(robot[rob].goal.position.x + robot[rob].controlPoint[cp].x), (int)(robot[rob].goal.position.y + robot[rob].controlPoint[cp].y)] = 0;
-            listQ.Add(new Vector2(robot[rob].goal.position.x + robot[rob].controlPoint[cp].x, robot[rob].goal.position.y + robot[rob].controlPoint[cp].y));
-        }
+        float xRotatedCP, yRotatedCP;   // Rotated control points
+        xRotatedCP = robot[rob].controlPoint[cp].x * (float)Math.Cos(robot[rob].goal.rotation * (Math.PI / 180.0)) - robot[rob].controlPoint[cp].y * (float)Math.Sin(robot[rob].goal.rotation * (Math.PI / 180.0));
+        yRotatedCP = robot[rob].controlPoint[cp].x * (float)Math.Sin(robot[rob].goal.rotation * (Math.PI / 180.0)) + robot[rob].controlPoint[cp].y * (float)Math.Cos(robot[rob].goal.rotation * (Math.PI / 180.0));
+        U[(int)(robot[rob].goal.position.x + xRotatedCP), (int)(robot[rob].goal.position.y + yRotatedCP)] = 0;
+        listQ.Add(new Vector2(robot[rob].goal.position.x + xRotatedCP, robot[rob].goal.position.y + yRotatedCP));
         list.Add(listQ);
 
-        // Calculate on U
+        // Calculate U
         int i = 0;
         while (list[i].Count != 0)
         {
