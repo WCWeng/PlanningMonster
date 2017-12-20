@@ -1,5 +1,5 @@
 ﻿// Planning Monster: a motion planning project of GRA class
-// Weng, Wei-Chen 2017/12/18
+// Weng, Wei-Chen 2017/12/20
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -33,9 +33,7 @@ public class PlanningMonster : MonoBehaviour
     Texture2D pathTexture;
     Texture2D[] pfTexture = new Texture2D[2];
     List<int[,]> potentialField = new List<int[,]>();
-    List<Node> Tree = new List<Node>();
     List<Vector3> pathList = new List<Vector3>();
-    List<Vector3> visited = new List<Vector3>();
     GameObject selectedPoly;
     bool moving = false;
     Vector3 mouseStartPosition;
@@ -202,24 +200,6 @@ public class PlanningMonster : MonoBehaviour
                     obstacles[Int32.Parse(selected[1])].initial.position.y = (int)newPosition.y;
                     obstacles[Int32.Parse(selected[1])].initial.rotation = (int)selectedPoly.transform.rotation.eulerAngles.z;
                 }
-                /*if (selected[0] == "robot")
-                {
-                    robot[Int32.Parse(selected[1])].initial.position.x = (float)Math.Round(newPosition.x, 0);
-                    robot[Int32.Parse(selected[1])].initial.position.y = (float)Math.Round(newPosition.y, 0);
-                    robot[Int32.Parse(selected[1])].initial.rotation = (float)Math.Round(selectedPoly.transform.rotation.eulerAngles.z, 0);
-                }
-                if (selected[0] == "goal")
-                {
-                    robot[Int32.Parse(selected[1])].goal.position.x = (float)Math.Round(newPosition.x, 0);
-                    robot[Int32.Parse(selected[1])].goal.position.y = (float)Math.Round(newPosition.y, 0);
-                    robot[Int32.Parse(selected[1])].goal.rotation = (float)Math.Round(selectedPoly.transform.rotation.eulerAngles.z, 0);
-                }
-                if (selected[0] == "obstacle")
-                {
-                    obstacles[Int32.Parse(selected[1])].initial.position.x = (float)Math.Round(newPosition.x, 0);
-                    obstacles[Int32.Parse(selected[1])].initial.position.y = (float)Math.Round(newPosition.y, 0);
-                    obstacles[Int32.Parse(selected[1])].initial.rotation = (float)Math.Round(selectedPoly.transform.rotation.eulerAngles.z, 0);
-                }*/
             }
 
             moving = false;
@@ -373,7 +353,7 @@ public class PlanningMonster : MonoBehaviour
     {
         int lineCount = 0;
         int numberOfRobot = Int32.Parse(robotDat[lineCount++]);
-        //print(numberOfRobot);
+
         robot = new Robot[numberOfRobot];
         for (int robotCount = 0; robotCount < numberOfRobot; robotCount++)
         {
@@ -381,13 +361,11 @@ public class PlanningMonster : MonoBehaviour
             robot[robotCount] = new Robot();
             // Polygon
             robot[robotCount].numberOfPolygon = Int32.Parse(robotDat[lineCount++]);
-            //print(robot[robotCount].numberOfPolygon);
             robot[robotCount].polygon = new Polygon[robot[robotCount].numberOfPolygon];
             for (int polygonCount = 0; polygonCount < robot[robotCount].numberOfPolygon; polygonCount++)
             {
                 // Vertices
                 robot[robotCount].polygon[polygonCount].numberOfVertices = Int32.Parse(robotDat[lineCount++]);
-                //print(robot[robotCount].polygon[polygonCount].numberOfVertices);
                 robot[robotCount].polygon[polygonCount].vertices = new Vector3[robot[robotCount].polygon[polygonCount].numberOfVertices];
                 for (int verticesCount = 0; verticesCount < robot[robotCount].polygon[polygonCount].numberOfVertices; verticesCount++)
                 {
@@ -395,8 +373,6 @@ public class PlanningMonster : MonoBehaviour
                     robot[robotCount].polygon[polygonCount].vertices[verticesCount].x = Convert.ToSingle(verticesSplit[0]);
                     robot[robotCount].polygon[polygonCount].vertices[verticesCount].y = Convert.ToSingle(verticesSplit[1]);
                     robot[robotCount].polygon[polygonCount].vertices[verticesCount].z = objDepth;
-                    //print("(" + robot[robotCount].polygon[polygonCount].vertices[verticesCount].x +
-                    //", " + robot[robotCount].polygon[polygonCount].vertices[verticesCount].y + ")");
                 }
             }
             // Configration
@@ -405,16 +381,13 @@ public class PlanningMonster : MonoBehaviour
             robot[robotCount].initial.position.y = Convert.ToSingle(initialSplit[1]);
             robot[robotCount].initial.position.z = objDepth;
             robot[robotCount].initial.rotation = Convert.ToSingle(initialSplit[2]);
-            //print(robot[robotCount].initial.position.x + ", " + robot[robotCount].initial.position.y + ", " + robot[robotCount].initial.rotation);
             string[] goalSplit = robotDat[lineCount++].Split(' ');
             robot[robotCount].goal.position.x = Convert.ToSingle(goalSplit[0]);
             robot[robotCount].goal.position.y = Convert.ToSingle(goalSplit[1]);
             robot[robotCount].goal.position.z = objDepth;
             robot[robotCount].goal.rotation = Convert.ToSingle(goalSplit[2]);
-            //print(robot[robotCount].goal.position.x + ", " + robot[robotCount].goal.position.y + ", " + robot[robotCount].goal.rotation);
             // Control Point
             robot[robotCount].numberOfControlPoint = Int32.Parse(robotDat[lineCount++]);
-            //print(robot[robotCount].numberOfControlPoint);
             robot[robotCount].controlPoint = new Vector3[robot[robotCount].numberOfControlPoint];
             for (int controlPointCount = 0; controlPointCount < robot[robotCount].numberOfControlPoint; controlPointCount++)
             {
@@ -422,8 +395,6 @@ public class PlanningMonster : MonoBehaviour
                 robot[robotCount].controlPoint[controlPointCount].x = Convert.ToSingle(controlPointSplit[0]);
                 robot[robotCount].controlPoint[controlPointCount].y = Convert.ToSingle(controlPointSplit[1]);
                 robot[robotCount].controlPoint[controlPointCount].z = objDepth;
-                //print("(" + robot[robotCount].controlPoint[controlPointCount].x + ", "
-                //+ robot[robotCount].controlPoint[controlPointCount].y + ")");
             }
         }
     }
@@ -432,7 +403,7 @@ public class PlanningMonster : MonoBehaviour
     {
         int lineCount = 0;
         int numberOfObstacles = Int32.Parse(obstaclesDat[lineCount++]);
-        //print(numberOfObstacles);
+
         obstacles = new Obstacles[numberOfObstacles];
         for (int obstaclesCount = 0; obstaclesCount < numberOfObstacles; obstaclesCount++)
         {
@@ -440,13 +411,11 @@ public class PlanningMonster : MonoBehaviour
             obstacles[obstaclesCount] = new Obstacles();
             // Polygon
             obstacles[obstaclesCount].numberOfPolygon = Int32.Parse(obstaclesDat[lineCount++]);
-            //print(obstacles[obstaclesCount].numberOfPolygon);
             obstacles[obstaclesCount].polygon = new Polygon[obstacles[obstaclesCount].numberOfPolygon];
             for (int polygonCount = 0; polygonCount < obstacles[obstaclesCount].numberOfPolygon; polygonCount++)
             {
                 // Vertices
                 obstacles[obstaclesCount].polygon[polygonCount].numberOfVertices = Int32.Parse(obstaclesDat[lineCount++]);
-                //print(obstacles[obstaclesCount].polygon[polygonCount].numberOfVertices);
                 obstacles[obstaclesCount].polygon[polygonCount].vertices = new Vector3[obstacles[obstaclesCount].polygon[polygonCount].numberOfVertices];
                 for (int verticesCount = 0; verticesCount < obstacles[obstaclesCount].polygon[polygonCount].numberOfVertices; verticesCount++)
                 {
@@ -454,8 +423,6 @@ public class PlanningMonster : MonoBehaviour
                     obstacles[obstaclesCount].polygon[polygonCount].vertices[verticesCount].x = Convert.ToSingle(verticesSplit[0]);
                     obstacles[obstaclesCount].polygon[polygonCount].vertices[verticesCount].y = Convert.ToSingle(verticesSplit[1]);
                     obstacles[obstaclesCount].polygon[polygonCount].vertices[verticesCount].z = objDepth;
-                    //print("(" + obstacles[obstaclesCount].polygon[polygonCount].vertices[verticesCount].x +
-                    //", " + obstacles[obstaclesCount].polygon[polygonCount].vertices[verticesCount].y + ")");
                 }
             }
             // Configration
@@ -464,7 +431,6 @@ public class PlanningMonster : MonoBehaviour
             obstacles[obstaclesCount].initial.position.y = Convert.ToSingle(initialSplit[1]);
             obstacles[obstaclesCount].initial.position.z = objDepth;
             obstacles[obstaclesCount].initial.rotation = Convert.ToSingle(initialSplit[2]);
-            //print(obstacles[obstaclesCount].initial.position.x + ", " + obstacles[obstaclesCount].initial.position.y + ", " + obstacles[obstaclesCount].initial.rotation);
         }
     }
 
@@ -517,34 +483,6 @@ public class PlanningMonster : MonoBehaviour
         polyGO.GetComponent<MeshCollider>().sharedMesh = polyMesh;
         polyGO.transform.parent = parentPoly.transform;
     }
-
-    /*void writeBackInitial()
-    {
-        for (int rob = 0; rob < robot.GetLength(0); rob++)
-        {
-            for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
-            {
-                GameObject GO = GameObject.Find("robot" + rob + "polygon" + poly);
-                Mesh polyMesh = GO.GetComponent<MeshFilter>().mesh;
-                Vector3[] vertices = new Vector3[polyMesh.vertices.GetLength(0)];
-                for (int ver = 0; ver < polyMesh.vertices.GetLength(0); ver++)
-                    vertices[ver] = mainCamera.WorldToScreenPoint(GO.transform.TransformPoint(polyMesh.vertices[ver]));
-                robot[rob].polygon[poly].vertices = vertices;
-            }
-        }
-        for (int obs = 0; obs < obstacles.GetLength(0); obs++)
-        {
-            for (int poly = 0; poly < obstacles[obs].numberOfPolygon; poly++)
-            {
-                GameObject GO = GameObject.Find("obstacle" + obs + "polygon" + poly);
-                Mesh polyMesh = GO.GetComponent<MeshFilter>().mesh;
-                Vector3[] vertices = new Vector3[polyMesh.vertices.GetLength(0)];
-                for (int ver = 0; ver < polyMesh.vertices.GetLength(0); ver++)
-                    vertices[ver] = mainCamera.WorldToScreenPoint(GO.transform.TransformPoint(polyMesh.vertices[ver]));
-                obstacles[obs].polygon[poly].vertices = vertices;
-            }
-        }
-    }*/
     //------------------------Calculate------------------------
     public void calculate()
     {
@@ -698,7 +636,8 @@ public class PlanningMonster : MonoBehaviour
     void BFS(int rob)
     {
         List<List<Vector3>> OPEN = new List<List<Vector3>>();
-        Vector3 nowPosition = new Vector3();
+        List<Node> Tree = new List<Node>();
+        List<Vector3> visited = new List<Vector3>();
         int d;  // rotate degree during every step
         bool SUCCESS = false;
         int step = 0;
@@ -716,13 +655,18 @@ public class PlanningMonster : MonoBehaviour
             initRotCP[cp].y = robot[rob].controlPoint[cp].x * (float)Math.Sin(initNewPos.z * (Math.PI / 180.0)) + robot[rob].controlPoint[cp].y * (float)Math.Cos(initNewPos.z * (Math.PI / 180.0));
         }
         int initPV = potentialField[0][(int)(initNewPos.x + initRotCP[0].x), (int)(initNewPos.y + initRotCP[0].y)] + potentialField[1][(int)(initNewPos.x + initRotCP[1].x), (int)(initNewPos.y + initRotCP[1].y)];
-        visited.Clear();
         visited.Add(initNewPos);
         Tree.Add(new Node(new Vector3(-1, -1, -1), initNewPos));
         OPEN[initPV].Add(initNewPos);
 
         while (!EMPTY(OPEN) && !SUCCESS)
         {
+            if (initPV == 0)
+            {
+                SUCCESS = true;
+                break;
+            }
+            
             step++;
             d = step % 2;
             if (d == 0)
@@ -735,6 +679,7 @@ public class PlanningMonster : MonoBehaviour
             int[] PV = new int[6];
 
             // Insert FIRST(OPEN)
+            Vector3 nowPosition = new Vector3();
             Vector3 temp = FIRST(OPEN);
             nowPosition.x = temp.x;
             nowPosition.y = temp.y;
@@ -757,18 +702,21 @@ public class PlanningMonster : MonoBehaviour
                 (int)(newPos[0].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[0].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[0].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[0].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[0].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[0].y + rotCP[1].y) >= 0)
-                PV[0] = potentialField[0][(int)(newPos[0].x + rotCP[0].x), (int)(newPos[0].y + rotCP[0].y)] + potentialField[1][(int)(newPos[0].x + rotCP[1].x), (int)(newPos[0].y + rotCP[1].y)];
-            else
-                PV[0] = OPEN.Count - 1;
-            if (!visited.Exists(x => x == newPos[0]))
             {
-                Tree.Add(new Node(nowPosition, newPos[0]));
-                visited.Add(newPos[0]);
-                OPEN[PV[0]].Add(newPos[0]);
-                if (PV[0] == 0)
+                if (!collision(rob, newPos[0]))
                 {
-                    SUCCESS = true;
-                    break;
+                    if (!visited.Exists(x => x == newPos[0]))
+                    {
+                        PV[0] = potentialField[0][(int)(newPos[0].x + rotCP[0].x), (int)(newPos[0].y + rotCP[0].y)] + potentialField[1][(int)(newPos[0].x + rotCP[1].x), (int)(newPos[0].y + rotCP[1].y)];
+                        Tree.Add(new Node(nowPosition, newPos[0]));
+                        visited.Add(newPos[0]);
+                        OPEN[PV[0]].Add(newPos[0]);
+                        if (PV[0] == 0)
+                        {
+                            SUCCESS = true;
+                            break;
+                        }
+                    }
                 }
             }
             // button
@@ -788,18 +736,21 @@ public class PlanningMonster : MonoBehaviour
                 (int)(newPos[1].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[1].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[1].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[1].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[1].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[1].y + rotCP[1].y) >= 0)
-                PV[1] = potentialField[0][(int)(newPos[1].x + rotCP[0].x), (int)(newPos[1].y + rotCP[0].y)] + potentialField[1][(int)(newPos[1].x + rotCP[1].x), (int)(newPos[1].y + rotCP[1].y)];
-            else
-                PV[1] = OPEN.Count - 1;
-            if (!visited.Exists(x => x == newPos[1]))
             {
-                Tree.Add(new Node(nowPosition, newPos[1]));
-                visited.Add(newPos[1]);
-                OPEN[PV[1]].Add(newPos[1]);
-                if (PV[1] == 0)
+                if (!collision(rob, newPos[1]))
                 {
-                    SUCCESS = true;
-                    break;
+                    if (!visited.Exists(x => x == newPos[1]))
+                    {
+                        PV[1] = potentialField[0][(int)(newPos[1].x + rotCP[0].x), (int)(newPos[1].y + rotCP[0].y)] + potentialField[1][(int)(newPos[1].x + rotCP[1].x), (int)(newPos[1].y + rotCP[1].y)];
+                        Tree.Add(new Node(nowPosition, newPos[1]));
+                        visited.Add(newPos[1]);
+                        OPEN[PV[1]].Add(newPos[1]);
+                        if (PV[1] == 0)
+                        {
+                            SUCCESS = true;
+                            break;
+                        }
+                    }
                 }
             }
             // left
@@ -819,18 +770,21 @@ public class PlanningMonster : MonoBehaviour
                 (int)(newPos[2].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[2].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[2].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[2].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[2].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[2].y + rotCP[1].y) >= 0)
-                PV[2] = potentialField[0][(int)(newPos[2].x + rotCP[0].x), (int)(newPos[2].y + rotCP[0].y)] + potentialField[1][(int)(newPos[2].x + rotCP[1].x), (int)(newPos[2].y + rotCP[1].y)];
-            else
-                PV[2] = OPEN.Count - 1;
-            if (!visited.Exists(x => x == newPos[2]))
             {
-                Tree.Add(new Node(nowPosition, newPos[2]));
-                visited.Add(newPos[2]);
-                OPEN[PV[2]].Add(newPos[2]);
-                if (PV[2] == 0)
+                if (!collision(rob, newPos[2]))
                 {
-                    SUCCESS = true;
-                    break;
+                    if (!visited.Exists(x => x == newPos[2]))
+                    {
+                        PV[2] = potentialField[0][(int)(newPos[2].x + rotCP[0].x), (int)(newPos[2].y + rotCP[0].y)] + potentialField[1][(int)(newPos[2].x + rotCP[1].x), (int)(newPos[2].y + rotCP[1].y)];
+                        Tree.Add(new Node(nowPosition, newPos[2]));
+                        visited.Add(newPos[2]);
+                        OPEN[PV[2]].Add(newPos[2]);
+                        if (PV[2] == 0)
+                        {
+                            SUCCESS = true;
+                            break;
+                        }
+                    }
                 }
             }
             // right
@@ -850,18 +804,21 @@ public class PlanningMonster : MonoBehaviour
                 (int)(newPos[3].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[3].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[3].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[3].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[3].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[3].y + rotCP[1].y) >= 0)
-                PV[3] = potentialField[0][(int)(newPos[3].x + rotCP[0].x), (int)(newPos[3].y + rotCP[0].y)] + potentialField[1][(int)(newPos[3].x + rotCP[1].x), (int)(newPos[3].y + rotCP[1].y)];
-            else
-                PV[3] = OPEN.Count - 1;
-            if (!visited.Exists(x => x == newPos[3]))
             {
-                Tree.Add(new Node(nowPosition, newPos[3]));
-                visited.Add(newPos[3]);
-                OPEN[PV[3]].Add(newPos[3]);
-                if (PV[3] == 0)
+                if (!collision(rob, newPos[3]))
                 {
-                    SUCCESS = true;
-                    break;
+                    if (!visited.Exists(x => x == newPos[3]))
+                    {
+                        PV[3] = potentialField[0][(int)(newPos[3].x + rotCP[0].x), (int)(newPos[3].y + rotCP[0].y)] + potentialField[1][(int)(newPos[3].x + rotCP[1].x), (int)(newPos[3].y + rotCP[1].y)];
+                        Tree.Add(new Node(nowPosition, newPos[3]));
+                        visited.Add(newPos[3]);
+                        OPEN[PV[3]].Add(newPos[3]);
+                        if (PV[3] == 0)
+                        {
+                            SUCCESS = true;
+                            break;
+                        }
+                    }
                 }
             }
             // counterclockwise
@@ -883,18 +840,21 @@ public class PlanningMonster : MonoBehaviour
                 (int)(newPos[4].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[4].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[4].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[4].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[4].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[4].y + rotCP[1].y) >= 0)
-                PV[4] = potentialField[0][(int)(newPos[4].x + rotCP[0].x), (int)(newPos[4].y + rotCP[0].y)] + potentialField[1][(int)(newPos[4].x + rotCP[1].x), (int)(newPos[4].y + rotCP[1].y)];
-            else
-                PV[4] = OPEN.Count - 1;
-            if (!visited.Exists(x => x == newPos[4]))
             {
-                Tree.Add(new Node(nowPosition, newPos[4]));
-                visited.Add(newPos[4]);
-                OPEN[PV[4]].Add(newPos[4]);
-                if (PV[4] == 0)
+                if (!collision(rob, newPos[4]))
                 {
-                    SUCCESS = true;
-                    break;
+                    if (!visited.Exists(x => x == newPos[4]))
+                    {
+                        PV[4] = potentialField[0][(int)(newPos[4].x + rotCP[0].x), (int)(newPos[4].y + rotCP[0].y)] + potentialField[1][(int)(newPos[4].x + rotCP[1].x), (int)(newPos[4].y + rotCP[1].y)];
+                        Tree.Add(new Node(nowPosition, newPos[4]));
+                        visited.Add(newPos[4]);
+                        OPEN[PV[4]].Add(newPos[4]);
+                        if (PV[4] == 0)
+                        {
+                            SUCCESS = true;
+                            break;
+                        }
+                    }
                 }
             }
             // clockwise
@@ -916,18 +876,21 @@ public class PlanningMonster : MonoBehaviour
                 (int)(newPos[5].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[5].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[5].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[5].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[5].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[5].y + rotCP[1].y) >= 0)
-                PV[5] = potentialField[0][(int)(newPos[5].x + rotCP[0].x), (int)(newPos[5].y + rotCP[0].y)] + potentialField[1][(int)(newPos[5].x + rotCP[1].x), (int)(newPos[5].y + rotCP[1].y)];
-            else
-                PV[0] = OPEN.Count - 1;
-            if (!visited.Exists(x => x == newPos[5]))
             {
-                Tree.Add(new Node(nowPosition, newPos[5]));
-                visited.Add(newPos[5]);
-                OPEN[PV[5]].Add(newPos[5]);
-                if (PV[5] == 0)
+                if (!collision(rob, newPos[5]))
                 {
-                    SUCCESS = true;
-                    break;
+                    if (!visited.Exists(x => x == newPos[5]))
+                    {
+                        PV[5] = potentialField[0][(int)(newPos[5].x + rotCP[0].x), (int)(newPos[5].y + rotCP[0].y)] + potentialField[1][(int)(newPos[5].x + rotCP[1].x), (int)(newPos[5].y + rotCP[1].y)];
+                        Tree.Add(new Node(nowPosition, newPos[5]));
+                        visited.Add(newPos[5]);
+                        OPEN[PV[5]].Add(newPos[5]);
+                        if (PV[5] == 0)
+                        {
+                            SUCCESS = true;
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -936,7 +899,7 @@ public class PlanningMonster : MonoBehaviour
         {
             treeToPathList(Tree);
             print("Finding path successful.");
-            print("Doing BFS " + step + " times.");
+            print("Do BFS " + step + " times.");
             print("Take " + pathList.Count + " steps to goal.");
         }
         else
@@ -994,13 +957,120 @@ public class PlanningMonster : MonoBehaviour
 
         pathList.Reverse();
     }
+
+    bool collision(int rob, Vector3 newPos)
+    {
+        // egde = (p1, p2). p1, p2 = Vector2.
+        List<List<List<Vector2>>> robPolyList = new List<List<List<Vector2>>>();    // robot - polygon - edge
+        List<List<List<List<Vector2>>>> obsList = new List<List<List<List<Vector2>>>>();    // obsacle - polygon - edge
+
+        // robot list
+        for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
+        {
+            List<List<Vector2>> tempPoly = new List<List<Vector2>>();
+            for (int ver = 0; ver < robot[rob].polygon[poly].numberOfVertices; ver++)
+            {
+                List<Vector2> tempEdge = new List<Vector2>();
+                Vector2 p1 = new Vector2();
+                Vector2 p2 = new Vector2();
+                p1.x = robot[rob].polygon[poly].vertices[ver].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[ver].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
+                p1.y = robot[rob].polygon[poly].vertices[ver].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[ver].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
+                if ((ver + 1) == robot[rob].polygon[poly].numberOfVertices)
+                {
+                    p2.x = robot[rob].polygon[poly].vertices[0].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[0].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
+                    p2.y = robot[rob].polygon[poly].vertices[0].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[0].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
+                }
+                else
+                {
+                    p2.x = robot[rob].polygon[poly].vertices[ver + 1].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[ver + 1].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
+                    p2.y = robot[rob].polygon[poly].vertices[ver + 1].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[ver + 1].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
+                }
+                tempEdge.Add(p1);
+                tempEdge.Add(p2);
+                tempPoly.Add(tempEdge);
+            }
+            robPolyList.Add(tempPoly);
+        }
+        // obstacle list
+        for (int obs = 0; obs < obstacles.GetLength(0); obs++)
+        {
+            List<List<List<Vector2>>> tempObs = new List<List<List<Vector2>>>();
+            for (int poly = 0; poly < obstacles[obs].numberOfPolygon; poly++)
+            {
+                List<List<Vector2>> tempPoly = new List<List<Vector2>>();
+                for (int ver = 0; ver < obstacles[obs].polygon[poly].numberOfVertices; ver++)
+                {
+                    List<Vector2> tempEdge = new List<Vector2>();
+                    Vector2 p3 = new Vector2();
+                    Vector2 p4 = new Vector2();
+                    p3.x = obstacles[obs].polygon[poly].vertices[ver].x * (float)Math.Cos(obstacles[obs].initial.rotation * (Math.PI / 180.0)) - obstacles[obs].polygon[poly].vertices[ver].y * (float)Math.Sin(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].initial.position.x;
+                    p3.y = obstacles[obs].polygon[poly].vertices[ver].x * (float)Math.Sin(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].polygon[poly].vertices[ver].y * (float)Math.Cos(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].initial.position.y;
+                    if ((ver + 1) == obstacles[obs].polygon[poly].numberOfVertices)
+                    {
+                        p4.x = obstacles[obs].polygon[poly].vertices[0].x * (float)Math.Cos(obstacles[obs].initial.rotation * (Math.PI / 180.0)) - obstacles[obs].polygon[poly].vertices[0].y * (float)Math.Sin(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].initial.position.x;
+                        p4.y = obstacles[obs].polygon[poly].vertices[0].x * (float)Math.Sin(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].polygon[poly].vertices[0].y * (float)Math.Cos(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].initial.position.y;
+                    }
+                    else
+                    {
+                        p4.x = obstacles[obs].polygon[poly].vertices[ver + 1].x * (float)Math.Cos(obstacles[obs].initial.rotation * (Math.PI / 180.0)) - obstacles[obs].polygon[poly].vertices[ver + 1].y * (float)Math.Sin(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].initial.position.x;
+                        p4.y = obstacles[obs].polygon[poly].vertices[ver + 1].x * (float)Math.Sin(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].polygon[poly].vertices[ver + 1].y * (float)Math.Cos(obstacles[obs].initial.rotation * (Math.PI / 180.0)) + obstacles[obs].initial.position.y;
+                    }
+                    tempEdge.Add(p3);
+                    tempEdge.Add(p4);
+                    tempPoly.Add(tempEdge);
+                }
+                tempObs.Add(tempPoly);
+            }
+            obsList.Add(tempObs);
+        }
+
+        // collision detection
+        for (int robPoly = 0; robPoly < robPolyList.Count; robPoly++)
+        {
+            for (int robEdg = 0; robEdg < robPolyList[robPoly].Count; robEdg++)
+            {
+                Vector2 p1 = robPolyList[robPoly][robEdg][0];
+                Vector2 p2 = robPolyList[robPoly][robEdg][1];
+                Vector2 v12 = p2 - p1;
+                Vector2 v12p = new Vector2(v12.y, -v12.x);
+
+                for (int obs = 0; obs < obsList.Count; obs++)
+                {
+                    for (int obsPoly = 0; obsPoly < obsList[obs].Count; obsPoly++)
+                    {
+                        for (int obsEdg = 0; obsEdg < obsList[obs][obsPoly].Count; obsEdg++)
+                        {
+                            Vector2 p3 = obsList[obs][obsPoly][obsEdg][0];
+                            Vector2 p4 = obsList[obs][obsPoly][obsEdg][1];
+                            Vector2 v13 = p3 - p1;
+                            Vector2 v14 = p4 - p1;
+                            float product1 = Vector2.Dot(v12p, v13) * Vector2.Dot(v12p, v14);
+                            Vector2 v34 = p4 - p3;
+                            Vector2 v34p = new Vector2(v34.y, -v34.x);
+                            Vector2 v31 = p1 - p3;
+                            Vector2 v32 = p2 - p3;
+                            float product2 = Vector2.Dot(v34p, v31) * Vector2.Dot(v34p, v32);
+                            if (p1.x < 0 || p1.x >= backgroundSize || p1.y < 0 || p1.y >= backgroundSize ||
+                            p2.x < 0 || p2.x >= backgroundSize || p2.y < 0 || p2.y >= backgroundSize ||
+                            p3.x < 0 || p3.x >= backgroundSize || p3.y < 0 || p3.y >= backgroundSize ||
+                            p4.x < 0 || p4.x >= backgroundSize || p4.y < 0 || p4.y >= backgroundSize)
+                                return true;
+                            if (product1 <= 0 && product2 <= 0)
+                                return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
     //------------------------Button------------------------
     public void startMoving()
     {
-        StartCoroutine(MoveOverSpeed());
+        StartCoroutine(Move());
     }
 
-    IEnumerator MoveOverSpeed()
+    IEnumerator Move()
     {
         Vector3 newPos = new Vector3();
         float newX;
@@ -1040,13 +1110,4 @@ public class PlanningMonster : MonoBehaviour
         GameObject.Find("Background").GetComponent<MeshRenderer>().material.mainTexture = pfTexture[1];
     }
     //------------------------end of code------------------------
-    void myBug()
-    {
-        for (int i = 0; i < robot[0].polygon[0].vertices.GetLength(0); i++)
-        {
-            print("robot[0].polygon[0].vertices[i]: " + robot[0].polygon[0].vertices[i]);
-        }
-        print("robot[0].initial.position: " + robot[0].initial.position);
-        print("robot[0].initial.rotation: " + robot[0].initial.rotation);
-    }
 }
