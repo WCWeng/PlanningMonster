@@ -3,6 +3,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.IO;
 using System;
 using UnityEngine;
@@ -17,6 +18,7 @@ public class PlanningMonster : MonoBehaviour
     public Material obsMaterial;
     public Material bgMaterial;
     public Text calculateTime;
+    public Text startButtonText;
 
     //-------------private-------------
     Stopwatch stopWatch = new Stopwatch();
@@ -34,6 +36,7 @@ public class PlanningMonster : MonoBehaviour
     Texture2D[] pfTexture = new Texture2D[2];
     List<int[,]> potentialField = new List<int[,]>();
     List<Vector3> pathList = new List<Vector3>();
+    int NF1listMAX;
     GameObject selectedPoly;
     bool moving = false;
     Vector3 mouseStartPosition;
@@ -43,6 +46,9 @@ public class PlanningMonster : MonoBehaviour
     Vector3 moveOffset;
     Vector3 rotateStartVector;
     Vector3 rotateCurrVector;
+    Thread extraThread;
+    bool calculating = false;
+    bool calculateFinished = false;
 
     //-------------struct-------------
     public struct Configuration
@@ -203,6 +209,23 @@ public class PlanningMonster : MonoBehaviour
             }
 
             moving = false;
+        }
+        if (calculating == true)
+        {
+            calculateTime.text = "Calculating...";
+            calculateTime.color = new Color(calculateTime.color.r, calculateTime.color.g, calculateTime.color.b, Mathf.PingPong(Time.time, 1));
+        }
+        if (calculateFinished == true)
+        {
+            TimeSpan ts = stopWatch.Elapsed;
+            string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}", ts.Hours, ts.Minutes, ts.Seconds, ts.Milliseconds / 10);
+            calculateTime.text = elapsedTime;
+            calculating = false;
+            calculateTime.color = new Color(0, 0, 0, 1);
+            drawPotentialFieldTexture();
+            drawPathListTexture();
+
+            calculateFinished = false;
         }
     }
 
@@ -486,14 +509,24 @@ public class PlanningMonster : MonoBehaviour
     //------------------------Calculate------------------------
     public void calculate()
     {
-        initializeBitmap();
-        drawObstacles();
+        startButtonText.text = "Start";
         potentialField.Clear();
         for (int x = 0; x < backgroundSize; x++)
             for (int y = 0; y < backgroundSize; y++)
                 pathTexture.SetPixel(x, y, new Color(0, 0, 0));
         pathTexture.Apply();
 
+        initializeBitmap();
+        drawObstacles();
+        pfTextureToPotentialField();
+
+        calculating = true;
+        extraThread = new Thread(calculateThread);
+        extraThread.Start();
+    }
+
+    void calculateThread()
+    {
         stopWatch.Reset();
         stopWatch.Start();  // Start timing
 
@@ -504,17 +537,9 @@ public class PlanningMonster : MonoBehaviour
         // BFS algo.
         for (int rob = 0; rob < robot.GetLength(0); rob++)
             BFS(rob);
-        // Draw path
-        for (int i = 0; i < pathList.Count - 1; i++)
-        {
-            pathTexture.SetPixel((int)pathList[i].x, (int)pathList[i].y, new Color(1, 0.55f, 0));
-        }
-        pathTexture.Apply();
 
         stopWatch.Stop();   // End timing
-        TimeSpan ts = stopWatch.Elapsed;
-        string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}", ts.Hours, ts.Minutes, ts.Seconds, ts.Milliseconds / 10);
-        calculateTime.text = elapsedTime;
+        calculateFinished = true;
     }
 
     void initializeBitmap()
@@ -542,10 +567,8 @@ public class PlanningMonster : MonoBehaviour
                     {
                         int xTex = (int)(x - backgroundOffset.x) / scale;
                         int yTex = (int)(y - backgroundOffset.y) / scale;
-                        //pfTexture[0].SetPixel(xTex, yTex, Color.black);
                         pfTexture[0].SetPixel(xTex, yTex, new Color(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f));
                         pfTexture[0].Apply();
-                        //pfTexture[1].SetPixel(xTex, yTex, Color.black);
                         pfTexture[1].SetPixel(xTex, yTex, new Color(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f));
                         pfTexture[1].Apply();
                     }
@@ -553,38 +576,74 @@ public class PlanningMonster : MonoBehaviour
             }
     }
 
+    void pfTextureToPotentialField()
+    {
+        for (int cp = 0; cp < 2; cp++)
+        {
+            int[,] U = new int[backgroundSize, backgroundSize];
+            for (int y = 0; y < backgroundSize; y++)
+            {
+                for (int x = 0; x < backgroundSize; x++)
+                {
+                    // Assign obstacles from pftexture to U
+                    if (pfTexture[cp].GetPixel(x, y) == new Color(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f))
+                    {
+                        U[x, y] = 255;
+                    }
+                    // Set free space to Int32.MaxValue in U
+                    if (pfTexture[cp].GetPixel(x, y) == new Color(254.0f / 255.0f, 254.0f / 255.0f, 254.0f / 255.0f))
+                    {
+                        U[x, y] = Int32.MaxValue;
+                    }
+                }
+            }
+
+            // Add U to "potentialField"
+            potentialField.Add(U);
+        }
+    }
+
+    void drawPotentialFieldTexture()
+    {
+        // Draw potentialField[cp] on pfTexture
+        for (int cp = 0; cp < 2; cp++)
+        {
+            for (int y = 0; y < backgroundSize; y++)
+            {
+                for (int x = 0; x < backgroundSize; x++)
+                {
+                    float color = (float)potentialField[cp][x, y] / NF1listMAX;
+                    pfTexture[cp].SetPixel(x, y, new Color(color, color, color));
+                }
+            }
+            pfTexture[cp].Apply();
+        }
+    }
+
+    void drawPathListTexture()
+    {
+        // Draw path
+        for (int i = 0; i < pathList.Count - 1; i++)
+        {
+            pathTexture.SetPixel((int)pathList[i].x, (int)pathList[i].y, new Color(1, 0.55f, 0));
+        }
+        pathTexture.Apply();
+    }
     //------------------------Algorithm------------------------
     void NFOne(int rob, int cp)
     {
-        int[,] U = new int[backgroundSize, backgroundSize];
         List<List<Vector2>> list = new List<List<Vector2>>();
-
-        // Initialize U
-        for (int y = 0; y < backgroundSize; y++)
-            for (int x = 0; x < backgroundSize; x++)
-            {
-                // Assign obstacles to U from pftexture
-                if (pfTexture[cp].GetPixel(x, y) == new Color(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f))
-                {
-                    U[x, y] = 255;
-                }
-                // Set free space in U to Int32.MaxValue
-                if (pfTexture[cp].GetPixel(x, y) == new Color(254.0f / 255.0f, 254.0f / 255.0f, 254.0f / 255.0f))
-                {
-                    U[x, y] = Int32.MaxValue;
-                }
-            }
 
         // Insert goal in list
         List<Vector2> listQ = new List<Vector2>();
         float xRotatedCP, yRotatedCP;   // Rotated control points
         xRotatedCP = robot[rob].controlPoint[cp].x * (float)Math.Cos(robot[rob].goal.rotation * (Math.PI / 180.0)) - robot[rob].controlPoint[cp].y * (float)Math.Sin(robot[rob].goal.rotation * (Math.PI / 180.0));
         yRotatedCP = robot[rob].controlPoint[cp].x * (float)Math.Sin(robot[rob].goal.rotation * (Math.PI / 180.0)) + robot[rob].controlPoint[cp].y * (float)Math.Cos(robot[rob].goal.rotation * (Math.PI / 180.0));
-        U[(int)(robot[rob].goal.position.x + xRotatedCP), (int)(robot[rob].goal.position.y + yRotatedCP)] = 0;
+        potentialField[cp][(int)(robot[rob].goal.position.x + xRotatedCP), (int)(robot[rob].goal.position.y + yRotatedCP)] = 0;
         listQ.Add(new Vector2(robot[rob].goal.position.x + xRotatedCP, robot[rob].goal.position.y + yRotatedCP));
         list.Add(listQ);
 
-        // Calculate U
+        // Calculate potentialField[cp]
         int i = 0;
         while (list[i].Count != 0)
         {
@@ -592,45 +651,34 @@ public class PlanningMonster : MonoBehaviour
             for (int qi = 0; qi < list[i].Count; qi++)
             {
                 if ((list[i][qi].x + 1) < backgroundSize)
-                    if (U[(int)(list[i][qi].x + 1), (int)list[i][qi].y] == Int32.MaxValue)  // right neighbor
+                    if (potentialField[cp][(int)(list[i][qi].x + 1), (int)list[i][qi].y] == Int32.MaxValue)  // right neighbor
                     {
-                        U[(int)(list[i][qi].x + 1), (int)list[i][qi].y] = i + 1;
+                        potentialField[cp][(int)(list[i][qi].x + 1), (int)list[i][qi].y] = i + 1;
                         listQtemp.Add(new Vector2((list[i][qi].x + 1), list[i][qi].y));
                     }
                 if ((list[i][qi].y + 1) < backgroundSize)
-                    if (U[(int)list[i][qi].x, (int)(list[i][qi].y + 1)] == Int32.MaxValue)  // up neighbor
+                    if (potentialField[cp][(int)list[i][qi].x, (int)(list[i][qi].y + 1)] == Int32.MaxValue)  // up neighbor
                     {
-                        U[(int)list[i][qi].x, (int)(list[i][qi].y + 1)] = i + 1;
+                        potentialField[cp][(int)list[i][qi].x, (int)(list[i][qi].y + 1)] = i + 1;
                         listQtemp.Add(new Vector2(list[i][qi].x, (list[i][qi].y + 1)));
                     }
                 if ((list[i][qi].x - 1) >= 0)
-                    if (U[(int)(list[i][qi].x - 1), (int)list[i][qi].y] == Int32.MaxValue)  // left neighbor
+                    if (potentialField[cp][(int)(list[i][qi].x - 1), (int)list[i][qi].y] == Int32.MaxValue)  // left neighbor
                     {
-                        U[(int)(list[i][qi].x - 1), (int)list[i][qi].y] = i + 1;
+                        potentialField[cp][(int)(list[i][qi].x - 1), (int)list[i][qi].y] = i + 1;
                         listQtemp.Add(new Vector2((list[i][qi].x - 1), list[i][qi].y));
                     }
                 if ((list[i][qi].y - 1) >= 0)
-                    if (U[(int)list[i][qi].x, (int)(list[i][qi].y - 1)] == Int32.MaxValue)  // down neighbor
+                    if (potentialField[cp][(int)list[i][qi].x, (int)(list[i][qi].y - 1)] == Int32.MaxValue)  // down neighbor
                     {
-                        U[(int)list[i][qi].x, (int)(list[i][qi].y - 1)] = i + 1;
+                        potentialField[cp][(int)list[i][qi].x, (int)(list[i][qi].y - 1)] = i + 1;
                         listQtemp.Add(new Vector2(list[i][qi].x, (list[i][qi].y - 1)));
                     }
             }
             list.Add(listQtemp);
             i++;
         }
-
-        // Assign U back to pfTexture
-        for (int y = 0; y < backgroundSize; y++)
-            for (int x = 0; x < backgroundSize; x++)
-            {
-                float color = (float)U[x, y] / i;
-                pfTexture[cp].SetPixel(x, y, new Color(color, color, color));
-                pfTexture[cp].Apply();
-            }
-
-        // Add U to "potentialField" list
-        potentialField.Add(U);
+        NF1listMAX = i;
     }
 
     void BFS(int rob)
@@ -666,7 +714,7 @@ public class PlanningMonster : MonoBehaviour
                 SUCCESS = true;
                 break;
             }
-            
+
             step++;
             d = step % 2;
             if (d == 0)
@@ -1051,9 +1099,7 @@ public class PlanningMonster : MonoBehaviour
                             Vector2 v32 = p2 - p3;
                             float product2 = Vector2.Dot(v34p, v31) * Vector2.Dot(v34p, v32);
                             if (p1.x < 0 || p1.x >= backgroundSize || p1.y < 0 || p1.y >= backgroundSize ||
-                            p2.x < 0 || p2.x >= backgroundSize || p2.y < 0 || p2.y >= backgroundSize ||
-                            p3.x < 0 || p3.x >= backgroundSize || p3.y < 0 || p3.y >= backgroundSize ||
-                            p4.x < 0 || p4.x >= backgroundSize || p4.y < 0 || p4.y >= backgroundSize)
+                            p2.x < 0 || p2.x >= backgroundSize || p2.y < 0 || p2.y >= backgroundSize)
                                 return true;
                             if (product1 <= 0 && product2 <= 0)
                                 return true;
@@ -1067,6 +1113,7 @@ public class PlanningMonster : MonoBehaviour
     //------------------------Button------------------------
     public void startMoving()
     {
+        startButtonText.text = "Replay";
         StartCoroutine(Move());
     }
 
