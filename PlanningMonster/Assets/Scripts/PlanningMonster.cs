@@ -1,5 +1,5 @@
 ﻿// Planning Monster: a motion planning project of GRA class
-// Weng, Wei-Chen 2017/12/20
+// Weng, Wei-Chen 2018/01/02
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,6 +17,7 @@ public class PlanningMonster : MonoBehaviour
     public Material goalMaterial;
     public Material obsMaterial;
     public Material bgMaterial;
+    public Text status;
     public Text calculateTime;
     public Text startButtonText;
 
@@ -39,6 +40,8 @@ public class PlanningMonster : MonoBehaviour
     int NF1listMAX;
     GameObject selectedPoly;
     bool moving = false;
+    Color lerpedColor;
+    bool SUCCESS = false;
     Vector3 mouseStartPosition;
     Vector3 mouseCurrPosition;
     Vector3 polyStartPosition;
@@ -46,7 +49,6 @@ public class PlanningMonster : MonoBehaviour
     Vector3 moveOffset;
     Vector3 rotateStartVector;
     Vector3 rotateCurrVector;
-    Thread extraThread;
     bool calculating = false;
     bool calculateFinished = false;
 
@@ -114,7 +116,7 @@ public class PlanningMonster : MonoBehaviour
         print("Background Size: " + backgroundSize);
 
         // Load data
-        loadData();
+        loadData(0);
     }
 
     // Update is called once per frame
@@ -192,7 +194,7 @@ public class PlanningMonster : MonoBehaviour
                 {
                     robot[Int32.Parse(selected[1])].initial.position.x = (int)newPosition.x;
                     robot[Int32.Parse(selected[1])].initial.position.y = (int)newPosition.y;
-                    robot[Int32.Parse(selected[1])].initial.rotation = (int)selectedPoly.transform.rotation.eulerAngles.z;
+                    robot[Int32.Parse(selected[1])].initial.rotation = (int)selectedPoly.transform.rotation.eulerAngles.z;  // "eulerAngles.z" always returns 0~359. No need to take the remainder(%).
                 }
                 if (selected[0] == "goal")
                 {
@@ -210,17 +212,29 @@ public class PlanningMonster : MonoBehaviour
 
             moving = false;
         }
-        if (calculating == true)
+        if (calculating)
         {
-            calculateTime.text = "Calculating...";
-            calculateTime.color = new Color(calculateTime.color.r, calculateTime.color.g, calculateTime.color.b, Mathf.PingPong(Time.time, 1));
+            status.text = "Calculating...";
+            status.color = new Color(calculateTime.color.r, calculateTime.color.g, calculateTime.color.b, Mathf.PingPong(Time.time, 1));
+            lerpedColor = Color.Lerp(new Color32(114, 207, 225, 1), new Color32(225, 225, 225, 1), Mathf.PingPong(Time.time, 1.5f) / 1.5f);
+            GameObject.Find("bg").GetComponent<MeshRenderer>().material.color = lerpedColor;
         }
-        if (calculateFinished == true)
+        if (calculateFinished)
         {
+            if (SUCCESS)
+            {
+                status.text = "Success!";
+                status.color = new Color(0, 0, 0, 1);
+            }
+            else
+            {
+                status.text = "Fail.";
+                status.color = new Color(0, 0, 0, 1);
+            }
+            GameObject.Find("bg").GetComponent<MeshRenderer>().material.color = new Color32(114, 207, 225, 1);
             TimeSpan ts = stopWatch.Elapsed;
             string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}", ts.Hours, ts.Minutes, ts.Seconds, ts.Milliseconds / 10);
             calculateTime.text = elapsedTime;
-            calculating = false;
             calculateTime.color = new Color(0, 0, 0, 1);
             drawPotentialFieldTexture();
             drawPathListTexture();
@@ -229,7 +243,7 @@ public class PlanningMonster : MonoBehaviour
         }
     }
 
-    public void loadData()
+    public void loadData(int data)
     {
         // Remove polygon & background
         for (int i = 0; i < deleteList.Count; i++)
@@ -239,7 +253,9 @@ public class PlanningMonster : MonoBehaviour
         deleteList.Clear();
 
         // Read data
-        readDat(Application.streamingAssetsPath + "/robot.dat", robotDat);
+        robotDat.Clear();
+        obstaclesDat.Clear();
+        readDat(Application.streamingAssetsPath + "/robot" + data + ".dat", robotDat);
         readDat(Application.streamingAssetsPath + "/obstacles.dat", obstaclesDat);
 
         // Create background, robots & obstacles data structure
@@ -520,16 +536,15 @@ public class PlanningMonster : MonoBehaviour
         drawObstacles();
         pfTextureToPotentialField();
 
-        calculating = true;
-        extraThread = new Thread(calculateThread);
-        extraThread.Start();
+        Thread exThread = new Thread(calculateThread);
+        exThread.Start();
     }
 
     void calculateThread()
     {
+        calculating = true;
         stopWatch.Reset();
         stopWatch.Start();  // Start timing
-
         // NF One algo.
         for (int rob = 0; rob < robot.GetLength(0); rob++)
             for (int cp = 0; cp < 2; cp++)
@@ -539,6 +554,7 @@ public class PlanningMonster : MonoBehaviour
             BFS(rob);
 
         stopWatch.Stop();   // End timing
+        calculating = false;
         calculateFinished = true;
     }
 
@@ -686,8 +702,8 @@ public class PlanningMonster : MonoBehaviour
         List<List<Vector3>> OPEN = new List<List<Vector3>>();
         List<Node> Tree = new List<Node>();
         List<Vector3> visited = new List<Vector3>();
-        int d;  // rotate degree during every step
-        bool SUCCESS = false;
+        int angle = 1;  // rotate angle during every step
+        SUCCESS = false;
         int step = 0;
 
         // Initialize "OPEN" list
@@ -702,29 +718,34 @@ public class PlanningMonster : MonoBehaviour
             initRotCP[cp].x = robot[rob].controlPoint[cp].x * (float)Math.Cos(initNewPos.z * (Math.PI / 180.0)) - robot[rob].controlPoint[cp].y * (float)Math.Sin(initNewPos.z * (Math.PI / 180.0));
             initRotCP[cp].y = robot[rob].controlPoint[cp].x * (float)Math.Sin(initNewPos.z * (Math.PI / 180.0)) + robot[rob].controlPoint[cp].y * (float)Math.Cos(initNewPos.z * (Math.PI / 180.0));
         }
-        int initPV = potentialField[0][(int)(initNewPos.x + initRotCP[0].x), (int)(initNewPos.y + initRotCP[0].y)] + potentialField[1][(int)(initNewPos.x + initRotCP[1].x), (int)(initNewPos.y + initRotCP[1].y)];
-        visited.Add(initNewPos);
-        Tree.Add(new Node(new Vector3(-1, -1, -1), initNewPos));
-        OPEN[initPV].Add(initNewPos);
+        int initPV = Int32.MaxValue;
+        if ((int)(initNewPos.x + initRotCP[0].x) < potentialField[0].GetLength(0) && (int)(initNewPos.x + initRotCP[0].x) >= 0 &&
+            (int)(initNewPos.y + initRotCP[0].y) < potentialField[0].GetLength(1) && (int)(initNewPos.y + initRotCP[0].y) >= 0 &&
+            (int)(initNewPos.x + initRotCP[1].x) < potentialField[1].GetLength(0) && (int)(initNewPos.x + initRotCP[1].x) >= 0 &&
+            (int)(initNewPos.y + initRotCP[1].y) < potentialField[1].GetLength(1) && (int)(initNewPos.y + initRotCP[1].y) >= 0)
+        {
+            if (!collision(rob, initNewPos))
+            {
+                initPV = potentialField[0][(int)(initNewPos.x + initRotCP[0].x), (int)(initNewPos.y + initRotCP[0].y)] + potentialField[1][(int)(initNewPos.x + initRotCP[1].x), (int)(initNewPos.y + initRotCP[1].y)];
+                visited.Add(initNewPos);
+                Tree.Add(new Node(new Vector3(-1, -1, -1), initNewPos));
+                OPEN[initPV].Add(initNewPos);
+                if (initPV == 0)
+                {
+                    SUCCESS = true;
+                }
+            }
+        }
 
         while (!EMPTY(OPEN) && !SUCCESS)
         {
-            if (initPV == 0)
-            {
-                SUCCESS = true;
-                break;
-            }
-
             step++;
-            d = step % 2;
-            if (d == 0)
-                d = 2;
 
             // Storage potential value & rotated control-points of six direction.
-            // 0: up, 1: button, 2: left, 3: right, 4: counterclockwise, 5: clockwise
+            // 0: up, 1: bottom, 2: left, 3: right, 4: counterclockwise, 5: clockwise
             Vector3[] newPos = new Vector3[6];  // x, y, rotation
             Vector2[] rotCP = new Vector2[2];  // Rotated control points
-            int[] PV = new int[6];
+            int[] PV = new int[6];  // sum of potential value of two control points
 
             // Insert FIRST(OPEN)
             Vector3 nowPosition = new Vector3();
@@ -744,10 +765,6 @@ public class PlanningMonster : MonoBehaviour
             }
             if ((int)(newPos[0].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[0].x + rotCP[0].x) >= 0 &&
                 (int)(newPos[0].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[0].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[0].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[0].x + rotCP[0].x) >= 0 &&
-                (int)(newPos[0].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[0].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[0].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[0].x + rotCP[1].x) >= 0 &&
-                (int)(newPos[0].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[0].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[0].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[0].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[0].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[0].y + rotCP[1].y) >= 0)
             {
@@ -767,7 +784,7 @@ public class PlanningMonster : MonoBehaviour
                     }
                 }
             }
-            // button
+            // bottom
             newPos[1].x = nowPosition.x;
             newPos[1].y = nowPosition.y - 1;
             newPos[1].z = nowPosition.z;
@@ -778,10 +795,6 @@ public class PlanningMonster : MonoBehaviour
             }
             if ((int)(newPos[1].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[1].x + rotCP[0].x) >= 0 &&
                 (int)(newPos[1].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[1].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[1].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[1].x + rotCP[0].x) >= 0 &&
-                (int)(newPos[1].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[1].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[1].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[1].x + rotCP[1].x) >= 0 &&
-                (int)(newPos[1].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[1].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[1].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[1].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[1].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[1].y + rotCP[1].y) >= 0)
             {
@@ -812,10 +825,6 @@ public class PlanningMonster : MonoBehaviour
             }
             if ((int)(newPos[2].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[2].x + rotCP[0].x) >= 0 &&
                 (int)(newPos[2].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[2].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[2].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[2].x + rotCP[0].x) >= 0 &&
-                (int)(newPos[2].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[2].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[2].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[2].x + rotCP[1].x) >= 0 &&
-                (int)(newPos[2].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[2].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[2].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[2].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[2].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[2].y + rotCP[1].y) >= 0)
             {
@@ -846,10 +855,6 @@ public class PlanningMonster : MonoBehaviour
             }
             if ((int)(newPos[3].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[3].x + rotCP[0].x) >= 0 &&
                 (int)(newPos[3].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[3].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[3].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[3].x + rotCP[0].x) >= 0 &&
-                (int)(newPos[3].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[3].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[3].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[3].x + rotCP[1].x) >= 0 &&
-                (int)(newPos[3].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[3].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[3].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[3].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[3].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[3].y + rotCP[1].y) >= 0)
             {
@@ -872,7 +877,7 @@ public class PlanningMonster : MonoBehaviour
             // counterclockwise
             newPos[4].x = nowPosition.x;
             newPos[4].y = nowPosition.y;
-            newPos[4].z = nowPosition.z + d;
+            newPos[4].z = nowPosition.z + angle;
             if (newPos[4].z >= 360)
                 newPos[4].z %= 360;
             for (int cp = 0; cp < 2; cp++)
@@ -882,10 +887,6 @@ public class PlanningMonster : MonoBehaviour
             }
             if ((int)(newPos[4].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[4].x + rotCP[0].x) >= 0 &&
                 (int)(newPos[4].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[4].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[4].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[4].x + rotCP[0].x) >= 0 &&
-                (int)(newPos[4].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[4].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[4].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[4].x + rotCP[1].x) >= 0 &&
-                (int)(newPos[4].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[4].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[4].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[4].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[4].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[4].y + rotCP[1].y) >= 0)
             {
@@ -908,9 +909,9 @@ public class PlanningMonster : MonoBehaviour
             // clockwise
             newPos[5].x = nowPosition.x;
             newPos[5].y = nowPosition.y;
-            newPos[5].z = nowPosition.z - d;
+            newPos[5].z = nowPosition.z - angle;
             if (newPos[5].z < 0)
-                newPos[5].z %= 360;
+                newPos[5].z += 360; // % will still return minus angle.
             for (int cp = 0; cp < 2; cp++)
             {
                 rotCP[cp].x = robot[rob].controlPoint[cp].x * (float)Math.Cos(newPos[5].z * (Math.PI / 180.0)) - robot[rob].controlPoint[cp].y * (float)Math.Sin(newPos[5].z * (Math.PI / 180.0));
@@ -918,10 +919,6 @@ public class PlanningMonster : MonoBehaviour
             }
             if ((int)(newPos[5].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[5].x + rotCP[0].x) >= 0 &&
                 (int)(newPos[5].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[5].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[5].x + rotCP[0].x) < potentialField[0].GetLength(0) && (int)(newPos[5].x + rotCP[0].x) >= 0 &&
-                (int)(newPos[5].y + rotCP[0].y) < potentialField[0].GetLength(1) && (int)(newPos[5].y + rotCP[0].y) >= 0 &&
-                (int)(newPos[5].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[5].x + rotCP[1].x) >= 0 &&
-                (int)(newPos[5].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[5].y + rotCP[1].y) >= 0 &&
                 (int)(newPos[5].x + rotCP[1].x) < potentialField[1].GetLength(0) && (int)(newPos[5].x + rotCP[1].x) >= 0 &&
                 (int)(newPos[5].y + rotCP[1].y) < potentialField[1].GetLength(1) && (int)(newPos[5].y + rotCP[1].y) >= 0)
             {
@@ -943,9 +940,11 @@ public class PlanningMonster : MonoBehaviour
             }
         }
 
+        if (Tree.Count != 0)
+            treeToPathList(Tree);
+
         if (SUCCESS)
         {
-            treeToPathList(Tree);
             print("Finding path successful.");
             print("Do BFS " + step + " times.");
             print("Take " + pathList.Count + " steps to goal.");
@@ -953,6 +952,7 @@ public class PlanningMonster : MonoBehaviour
         else
         {
             print("Fail to find path.");
+            print("Do BFS " + step + " times.");
         }
     }
 
@@ -971,7 +971,6 @@ public class PlanningMonster : MonoBehaviour
                 break;
             }
         }
-
         return first;
     }
 
@@ -1101,7 +1100,7 @@ public class PlanningMonster : MonoBehaviour
                             if (p1.x < 0 || p1.x >= backgroundSize || p1.y < 0 || p1.y >= backgroundSize ||
                             p2.x < 0 || p2.x >= backgroundSize || p2.y < 0 || p2.y >= backgroundSize)
                                 return true;
-                            if (product1 <= 0 && product2 <= 0)
+                            if (product1 < 0 && product2 < 0)
                                 return true;
                         }
                     }
