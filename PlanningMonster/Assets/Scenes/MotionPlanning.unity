@@ -1182,9 +1182,21 @@ MonoBehaviour:
   m_Value: 0
   m_Options:
     m_Options:
-    - m_Text: robot 0
+    - m_Text: data 0
       m_Image: {fileID: 0}
-    - m_Text: robot 1
+    - m_Text: data 1
+      m_Image: {fileID: 0}
+    - m_Text: data 2
+      m_Image: {fileID: 0}
+    - m_Text: data 3
+      m_Image: {fileID: 0}
+    - m_Text: data 4
+      m_Image: {fileID: 0}
+    - m_Text: data 5
+      m_Image: {fileID: 0}
+    - m_Text: data 6
+      m_Image: {fileID: 0}
+    - m_Text: data 7
       m_Image: {fileID: 0}
   m_OnValueChanged:
     m_PersistentCalls:
@@ -2521,7 +2533,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: robot 0
+  m_Text: data 0
 --- !u!222 &1909169596
 CanvasRenderer:
   m_ObjectHideFlags: 0

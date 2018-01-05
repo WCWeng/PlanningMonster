@@ -1,5 +1,5 @@
 ﻿// Planning Monster: a motion planning project of GRA class
-// Weng, Wei-Chen 2018/01/02
+// Weng, Wei-Chen 2018/01/05
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -256,7 +256,7 @@ public class PlanningMonster : MonoBehaviour
         robotDat.Clear();
         obstaclesDat.Clear();
         readDat(Application.streamingAssetsPath + "/robot" + data + ".dat", robotDat);
-        readDat(Application.streamingAssetsPath + "/obstacles.dat", obstaclesDat);
+        readDat(Application.streamingAssetsPath + "/obstacles" + data + ".dat", obstaclesDat);
 
         // Create background, robots & obstacles data structure
         bgCreate();
