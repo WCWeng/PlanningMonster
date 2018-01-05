@@ -1,5 +1,5 @@
 ﻿// Planning Monster: a motion planning project of GRA class
-// Weng, Wei-Chen 2018/01/05
+// Weng, Wei-Chen 2018/01/06
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,8 +18,9 @@ public class PlanningMonster : MonoBehaviour
     public Material obsMaterial;
     public Material bgMaterial;
     public Text status;
+    public Text BFSCount;
     public Text calculateTime;
-    public Text startButtonText;
+    public Text playButtonText;
     public Toggle normalized;
 
     //-------------private-------------
@@ -38,6 +39,7 @@ public class PlanningMonster : MonoBehaviour
     Texture2D[] pfTexture = new Texture2D[2];
     List<int[,]> potentialField = new List<int[,]>();
     List<Vector3> pathList = new List<Vector3>();
+    int step = 0;
     int NF1listMAX;
     GameObject selectedPoly;
     bool moving = false;
@@ -219,6 +221,7 @@ public class PlanningMonster : MonoBehaviour
             status.color = new Color(calculateTime.color.r, calculateTime.color.g, calculateTime.color.b, Mathf.PingPong(Time.time, 1));
             lerpedColor = Color.Lerp(new Color32(114, 207, 225, 1), new Color32(225, 225, 225, 1), Mathf.PingPong(Time.time, 1.5f) / 1.5f);
             GameObject.Find("bg").GetComponent<MeshRenderer>().material.color = lerpedColor;
+            BFSCount.text = "BFS: " + step.ToString();
         }
         if (calculateFinished)
         {
@@ -527,7 +530,7 @@ public class PlanningMonster : MonoBehaviour
     public void calculate()
     {
         // reset
-        startButtonText.text = "Start";
+        playButtonText.text = "Play";
         potentialField.Clear();
         for (int x = 0; x < backgroundSize; x++)
             for (int y = 0; y < backgroundSize; y++)
@@ -712,7 +715,7 @@ public class PlanningMonster : MonoBehaviour
         List<Vector3> visited = new List<Vector3>();
         int angle = 1;  // rotate angle during every step
         SUCCESS = false;
-        int step = 0;
+        step = 0;
 
         // Initialize "OPEN" list
         for (int i = 0; i < 10000; i++)
@@ -1118,9 +1121,9 @@ public class PlanningMonster : MonoBehaviour
         return false;
     }
     //------------------------Button------------------------
-    public void startMoving()
+    public void play()
     {
-        startButtonText.text = "Replay";
+        playButtonText.text = "Replay";
         StartCoroutine(Move());
     }
 
