@@ -20,6 +20,7 @@ public class PlanningMonster : MonoBehaviour
     public Text status;
     public Text calculateTime;
     public Text startButtonText;
+    public Toggle normalized;
 
     //-------------private-------------
     Stopwatch stopWatch = new Stopwatch();
@@ -525,6 +526,7 @@ public class PlanningMonster : MonoBehaviour
     //------------------------Calculate------------------------
     public void calculate()
     {
+        // reset
         startButtonText.text = "Start";
         potentialField.Clear();
         for (int x = 0; x < backgroundSize; x++)
@@ -532,10 +534,12 @@ public class PlanningMonster : MonoBehaviour
                 pathTexture.SetPixel(x, y, new Color(0, 0, 0));
         pathTexture.Apply();
 
+        // initialize
         initializeBitmap();
         drawObstacles();
         pfTextureToPotentialField();
 
+        // calculate core
         Thread exThread = new Thread(calculateThread);
         exThread.Start();
     }
@@ -628,7 +632,11 @@ public class PlanningMonster : MonoBehaviour
             {
                 for (int x = 0; x < backgroundSize; x++)
                 {
-                    float color = (float)potentialField[cp][x, y] / NF1listMAX;
+                    float color;
+                    if (normalized.isOn)
+                        color = (float)potentialField[cp][x, y] / NF1listMAX;
+                    else
+                        color = potentialField[cp][x, y] / 255.0f;
                     pfTexture[cp].SetPixel(x, y, new Color(color, color, color));
                 }
             }
