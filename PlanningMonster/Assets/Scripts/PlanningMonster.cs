@@ -712,7 +712,7 @@ public class PlanningMonster : MonoBehaviour
     {
         List<List<Vector3>> OPEN = new List<List<Vector3>>();
         List<Node> Tree = new List<Node>();
-        List<Vector3> visited = new List<Vector3>();
+        List<bool[,]> visited = new List<bool[,]>();    // A list contains 360 backgrounds. Every background represents an angle.
         int angle = 1;  // rotate angle during every step
         SUCCESS = false;
         step = 0;
@@ -720,6 +720,13 @@ public class PlanningMonster : MonoBehaviour
         // Initialize "OPEN" list
         for (int i = 0; i < 10000; i++)
             OPEN.Add(new List<Vector3>());
+
+        // // Initialize "visited" list
+        for (int i = 0; i < 360; i++)
+        {
+            bool[,] bg = new bool[backgroundSize, backgroundSize];
+            visited.Add(bg);
+        }
 
         // Insert initial position in "OPEN"
         Vector3 initNewPos = new Vector3(robot[rob].initial.position.x, robot[rob].initial.position.y, robot[rob].initial.rotation);
@@ -738,7 +745,7 @@ public class PlanningMonster : MonoBehaviour
             if (!collision(rob, initNewPos))
             {
                 initPV = potentialField[0][(int)(initNewPos.x + initRotCP[0].x), (int)(initNewPos.y + initRotCP[0].y)] + potentialField[1][(int)(initNewPos.x + initRotCP[1].x), (int)(initNewPos.y + initRotCP[1].y)];
-                visited.Add(initNewPos);
+                visited[(int)initNewPos.z][(int)initNewPos.x, (int)initNewPos.y] = true;
                 Tree.Add(new Node(new Vector3(-1, -1, -1), initNewPos));
                 OPEN[initPV].Add(initNewPos);
                 if (initPV == 0)
@@ -781,11 +788,11 @@ public class PlanningMonster : MonoBehaviour
             {
                 if (!collision(rob, newPos[0]))
                 {
-                    if (!visited.Exists(x => x == newPos[0]))
+                    if (!visited[(int)newPos[0].z][(int)newPos[0].x, (int)newPos[0].y])
                     {
                         PV[0] = potentialField[0][(int)(newPos[0].x + rotCP[0].x), (int)(newPos[0].y + rotCP[0].y)] + potentialField[1][(int)(newPos[0].x + rotCP[1].x), (int)(newPos[0].y + rotCP[1].y)];
                         Tree.Add(new Node(nowPosition, newPos[0]));
-                        visited.Add(newPos[0]);
+                        visited[(int)newPos[0].z][(int)newPos[0].x, (int)newPos[0].y] = true;
                         OPEN[PV[0]].Add(newPos[0]);
                         if (PV[0] == 0)
                         {
@@ -811,11 +818,11 @@ public class PlanningMonster : MonoBehaviour
             {
                 if (!collision(rob, newPos[1]))
                 {
-                    if (!visited.Exists(x => x == newPos[1]))
+                    if (!visited[(int)newPos[1].z][(int)newPos[1].x, (int)newPos[1].y])
                     {
                         PV[1] = potentialField[0][(int)(newPos[1].x + rotCP[0].x), (int)(newPos[1].y + rotCP[0].y)] + potentialField[1][(int)(newPos[1].x + rotCP[1].x), (int)(newPos[1].y + rotCP[1].y)];
                         Tree.Add(new Node(nowPosition, newPos[1]));
-                        visited.Add(newPos[1]);
+                        visited[(int)newPos[1].z][(int)newPos[1].x, (int)newPos[1].y] = true;
                         OPEN[PV[1]].Add(newPos[1]);
                         if (PV[1] == 0)
                         {
@@ -841,11 +848,11 @@ public class PlanningMonster : MonoBehaviour
             {
                 if (!collision(rob, newPos[2]))
                 {
-                    if (!visited.Exists(x => x == newPos[2]))
+                    if (!visited[(int)newPos[2].z][(int)newPos[2].x, (int)newPos[2].y])
                     {
                         PV[2] = potentialField[0][(int)(newPos[2].x + rotCP[0].x), (int)(newPos[2].y + rotCP[0].y)] + potentialField[1][(int)(newPos[2].x + rotCP[1].x), (int)(newPos[2].y + rotCP[1].y)];
                         Tree.Add(new Node(nowPosition, newPos[2]));
-                        visited.Add(newPos[2]);
+                        visited[(int)newPos[2].z][(int)newPos[2].x, (int)newPos[2].y] = true;
                         OPEN[PV[2]].Add(newPos[2]);
                         if (PV[2] == 0)
                         {
@@ -871,11 +878,11 @@ public class PlanningMonster : MonoBehaviour
             {
                 if (!collision(rob, newPos[3]))
                 {
-                    if (!visited.Exists(x => x == newPos[3]))
+                    if (!visited[(int)newPos[3].z][(int)newPos[3].x, (int)newPos[3].y])
                     {
                         PV[3] = potentialField[0][(int)(newPos[3].x + rotCP[0].x), (int)(newPos[3].y + rotCP[0].y)] + potentialField[1][(int)(newPos[3].x + rotCP[1].x), (int)(newPos[3].y + rotCP[1].y)];
                         Tree.Add(new Node(nowPosition, newPos[3]));
-                        visited.Add(newPos[3]);
+                        visited[(int)newPos[3].z][(int)newPos[3].x, (int)newPos[3].y] = true;
                         OPEN[PV[3]].Add(newPos[3]);
                         if (PV[3] == 0)
                         {
@@ -903,11 +910,11 @@ public class PlanningMonster : MonoBehaviour
             {
                 if (!collision(rob, newPos[4]))
                 {
-                    if (!visited.Exists(x => x == newPos[4]))
+                    if (!visited[(int)newPos[4].z][(int)newPos[4].x, (int)newPos[4].y])
                     {
                         PV[4] = potentialField[0][(int)(newPos[4].x + rotCP[0].x), (int)(newPos[4].y + rotCP[0].y)] + potentialField[1][(int)(newPos[4].x + rotCP[1].x), (int)(newPos[4].y + rotCP[1].y)];
                         Tree.Add(new Node(nowPosition, newPos[4]));
-                        visited.Add(newPos[4]);
+                        visited[(int)newPos[4].z][(int)newPos[4].x, (int)newPos[4].y] = true;
                         OPEN[PV[4]].Add(newPos[4]);
                         if (PV[4] == 0)
                         {
@@ -935,11 +942,11 @@ public class PlanningMonster : MonoBehaviour
             {
                 if (!collision(rob, newPos[5]))
                 {
-                    if (!visited.Exists(x => x == newPos[5]))
+                    if (!visited[(int)newPos[5].z][(int)newPos[5].x, (int)newPos[5].y])
                     {
                         PV[5] = potentialField[0][(int)(newPos[5].x + rotCP[0].x), (int)(newPos[5].y + rotCP[0].y)] + potentialField[1][(int)(newPos[5].x + rotCP[1].x), (int)(newPos[5].y + rotCP[1].y)];
                         Tree.Add(new Node(nowPosition, newPos[5]));
-                        visited.Add(newPos[5]);
+                        visited[(int)newPos[5].z][(int)newPos[5].x, (int)newPos[5].y] = true;
                         OPEN[PV[5]].Add(newPos[5]);
                         if (PV[5] == 0)
                         {
