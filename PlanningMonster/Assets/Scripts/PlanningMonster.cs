@@ -1,5 +1,5 @@
 ﻿// Planning Monster: a motion planning project of GRA class
-// Weng, Wei-Chen 2018/01/06
+// Weng, Wei-Chen 2018/01/07
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -22,6 +22,7 @@ public class PlanningMonster : MonoBehaviour
     public Text calculateTime;
     public Text playButtonText;
     public Toggle normalized;
+    public Toggle findingPathAnimation;
 
     //-------------private-------------
     Stopwatch stopWatch = new Stopwatch();
@@ -40,7 +41,7 @@ public class PlanningMonster : MonoBehaviour
     List<int[,]> potentialField = new List<int[,]>();
     List<Vector3> pathList = new List<Vector3>();
     int step = 0;
-    int NF1listMAX;
+    int[] NF1listMAX = new int[2];
     GameObject selectedPoly;
     bool moving = false;
     Color lerpedColor;
@@ -52,6 +53,7 @@ public class PlanningMonster : MonoBehaviour
     Vector3 moveOffset;
     Vector3 rotateStartVector;
     Vector3 rotateCurrVector;
+    List<List<List<List<Vector2>>>> obsList = new List<List<List<List<Vector2>>>>();    // obsacle - polygon - edge
     bool calculating = false;
     bool calculateFinished = false;
 
@@ -221,7 +223,12 @@ public class PlanningMonster : MonoBehaviour
             status.color = new Color(calculateTime.color.r, calculateTime.color.g, calculateTime.color.b, Mathf.PingPong(Time.time, 1));
             lerpedColor = Color.Lerp(new Color32(114, 207, 225, 1), new Color32(225, 225, 225, 1), Mathf.PingPong(Time.time, 1.5f) / 1.5f);
             GameObject.Find("bg").GetComponent<MeshRenderer>().material.color = lerpedColor;
+            TimeSpan ts = stopWatch.Elapsed;
+            string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}", ts.Hours, ts.Minutes, ts.Seconds, ts.Milliseconds / 10);
+            calculateTime.text = elapsedTime;
             BFSCount.text = "BFS: " + step.ToString();
+            if (findingPathAnimation.isOn)
+                drawPathListTexture();
         }
         if (calculateFinished)
         {
@@ -549,31 +556,39 @@ public class PlanningMonster : MonoBehaviour
 
     void calculateThread()
     {
-        calculating = true;
-        stopWatch.Reset();
-        stopWatch.Start();  // Start timing
-        // NF One algo.
-        for (int rob = 0; rob < robot.GetLength(0); rob++)
-            for (int cp = 0; cp < 2; cp++)
-                NFOne(rob, cp);
-        // BFS algo.
-        for (int rob = 0; rob < robot.GetLength(0); rob++)
-            BFS(rob);
+        try
+        {
+            calculating = true;
+            stopWatch.Reset();
+            stopWatch.Start();  // Start timing
+                                // NF One algo.
+            for (int rob = 0; rob < robot.GetLength(0); rob++)
+                for (int cp = 0; cp < 2; cp++)
+                    NFOne(rob, cp);
+            // BFS algo.
+            for (int rob = 0; rob < robot.GetLength(0); rob++)
+                BFS(rob);
 
-        stopWatch.Stop();   // End timing
-        calculating = false;
-        calculateFinished = true;
+            stopWatch.Stop();   // End timing
+            calculating = false;
+            calculateFinished = true;
+        }
+        catch (Exception e)
+        {
+            print(e);
+            throw;
+        }
     }
 
     void initializeBitmap()
     {
         for (int y = 0; y < pfTexture[0].height; y++)
             for (int x = 0; x < pfTexture[0].width; x++)
-                pfTexture[0].SetPixel(x, y, new Color(254.0f / 255.0f, 254.0f / 255.0f, 254.0f / 255.0f));
+                pfTexture[0].SetPixel(x, y, new Color(0f / 255.0f, 0f / 255.0f, 0f / 255.0f));
         pfTexture[0].Apply();
         for (int y = 0; y < pfTexture[1].height; y++)
             for (int x = 0; x < pfTexture[1].width; x++)
-                pfTexture[1].SetPixel(x, y, new Color(254.0f / 255.0f, 254.0f / 255.0f, 254.0f / 255.0f));
+                pfTexture[1].SetPixel(x, y, new Color(0f / 255.0f, 0f / 255.0f, 0f / 255.0f));
         pfTexture[1].Apply();
     }
 
@@ -604,6 +619,7 @@ public class PlanningMonster : MonoBehaviour
         for (int cp = 0; cp < 2; cp++)
         {
             int[,] U = new int[backgroundSize, backgroundSize];
+
             for (int y = 0; y < backgroundSize; y++)
             {
                 for (int x = 0; x < backgroundSize; x++)
@@ -611,10 +627,10 @@ public class PlanningMonster : MonoBehaviour
                     // Assign obstacles from pftexture to U
                     if (pfTexture[cp].GetPixel(x, y) == new Color(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f))
                     {
-                        U[x, y] = 255;
+                        U[x, y] = 1000;
                     }
                     // Set free space to Int32.MaxValue in U
-                    if (pfTexture[cp].GetPixel(x, y) == new Color(254.0f / 255.0f, 254.0f / 255.0f, 254.0f / 255.0f))
+                    if (pfTexture[cp].GetPixel(x, y) == new Color(0f / 255.0f, 0f / 255.0f, 0f / 255.0f))
                     {
                         U[x, y] = Int32.MaxValue;
                     }
@@ -637,7 +653,7 @@ public class PlanningMonster : MonoBehaviour
                 {
                     float color;
                     if (normalized.isOn)
-                        color = (float)potentialField[cp][x, y] / NF1listMAX;
+                        color = (float)potentialField[cp][x, y] / NF1listMAX[cp];
                     else
                         color = potentialField[cp][x, y] / 255.0f;
                     pfTexture[cp].SetPixel(x, y, new Color(color, color, color));
@@ -705,7 +721,7 @@ public class PlanningMonster : MonoBehaviour
             list.Add(listQtemp);
             i++;
         }
-        NF1listMAX = i;
+        NF1listMAX[cp] = i;
     }
 
     void BFS(int rob)
@@ -721,12 +737,17 @@ public class PlanningMonster : MonoBehaviour
         for (int i = 0; i < 10000; i++)
             OPEN.Add(new List<Vector3>());
 
-        // // Initialize "visited" list
+
+        // Initialize "visited" list
         for (int i = 0; i < 360; i++)
         {
             bool[,] bg = new bool[backgroundSize, backgroundSize];
             visited.Add(bg);
         }
+
+        // Generate obstacles edge list for collision detection
+        // Obstacles won't move during calculation. The list only needs to be calculated one time for every BFS.
+        obsListGenerate();
 
         // Insert initial position in "OPEN"
         Vector3 initNewPos = new Vector3(robot[rob].initial.position.x, robot[rob].initial.position.y, robot[rob].initial.rotation);
@@ -956,6 +977,9 @@ public class PlanningMonster : MonoBehaviour
                     }
                 }
             }
+            if (findingPathAnimation.isOn)
+                if (Tree.Count != 0)
+                    treeToPathList(Tree);
         }
 
         if (Tree.Count != 0)
@@ -963,14 +987,13 @@ public class PlanningMonster : MonoBehaviour
 
         if (SUCCESS)
         {
-            print("Finding path successful.");
+            print("Finding path successfully.");
             print("Do BFS " + step + " times.");
             print("Take " + pathList.Count + " steps to goal.");
         }
         else
         {
-            print("Fail to find path.");
-            print("Do BFS " + step + " times.");
+            print("Failed to find path.");
         }
     }
 
@@ -1023,39 +1046,8 @@ public class PlanningMonster : MonoBehaviour
         pathList.Reverse();
     }
 
-    bool collision(int rob, Vector3 newPos)
+    void obsListGenerate()
     {
-        // egde = (p1, p2). p1, p2 = Vector2.
-        List<List<List<Vector2>>> robPolyList = new List<List<List<Vector2>>>();    // robot - polygon - edge
-        List<List<List<List<Vector2>>>> obsList = new List<List<List<List<Vector2>>>>();    // obsacle - polygon - edge
-
-        // robot list
-        for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
-        {
-            List<List<Vector2>> tempPoly = new List<List<Vector2>>();
-            for (int ver = 0; ver < robot[rob].polygon[poly].numberOfVertices; ver++)
-            {
-                List<Vector2> tempEdge = new List<Vector2>();
-                Vector2 p1 = new Vector2();
-                Vector2 p2 = new Vector2();
-                p1.x = robot[rob].polygon[poly].vertices[ver].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[ver].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
-                p1.y = robot[rob].polygon[poly].vertices[ver].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[ver].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
-                if ((ver + 1) == robot[rob].polygon[poly].numberOfVertices)
-                {
-                    p2.x = robot[rob].polygon[poly].vertices[0].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[0].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
-                    p2.y = robot[rob].polygon[poly].vertices[0].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[0].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
-                }
-                else
-                {
-                    p2.x = robot[rob].polygon[poly].vertices[ver + 1].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[ver + 1].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
-                    p2.y = robot[rob].polygon[poly].vertices[ver + 1].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[ver + 1].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
-                }
-                tempEdge.Add(p1);
-                tempEdge.Add(p2);
-                tempPoly.Add(tempEdge);
-            }
-            robPolyList.Add(tempPoly);
-        }
         // obstacle list
         for (int obs = 0; obs < obstacles.GetLength(0); obs++)
         {
@@ -1088,6 +1080,40 @@ public class PlanningMonster : MonoBehaviour
             }
             obsList.Add(tempObs);
         }
+    }
+
+    bool collision(int rob, Vector3 newPos)
+    {
+        // egde = (p1, p2). p1, p2 = Vector2.
+        List<List<List<Vector2>>> robPolyList = new List<List<List<Vector2>>>();    // robot - polygon - edge
+
+        // robot list
+        for (int poly = 0; poly < robot[rob].numberOfPolygon; poly++)
+        {
+            List<List<Vector2>> tempPoly = new List<List<Vector2>>();
+            for (int ver = 0; ver < robot[rob].polygon[poly].numberOfVertices; ver++)
+            {
+                List<Vector2> tempEdge = new List<Vector2>();
+                Vector2 p1 = new Vector2();
+                Vector2 p2 = new Vector2();
+                p1.x = robot[rob].polygon[poly].vertices[ver].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[ver].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
+                p1.y = robot[rob].polygon[poly].vertices[ver].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[ver].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
+                if ((ver + 1) == robot[rob].polygon[poly].numberOfVertices)
+                {
+                    p2.x = robot[rob].polygon[poly].vertices[0].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[0].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
+                    p2.y = robot[rob].polygon[poly].vertices[0].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[0].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
+                }
+                else
+                {
+                    p2.x = robot[rob].polygon[poly].vertices[ver + 1].x * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) - robot[rob].polygon[poly].vertices[ver + 1].y * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + newPos.x;
+                    p2.y = robot[rob].polygon[poly].vertices[ver + 1].x * (float)Math.Sin(newPos.z * (Math.PI / 180.0)) + robot[rob].polygon[poly].vertices[ver + 1].y * (float)Math.Cos(newPos.z * (Math.PI / 180.0)) + newPos.y;
+                }
+                tempEdge.Add(p1);
+                tempEdge.Add(p2);
+                tempPoly.Add(tempEdge);
+            }
+            robPolyList.Add(tempPoly);
+        }
 
         // collision detection
         for (int robPoly = 0; robPoly < robPolyList.Count; robPoly++)
@@ -1109,12 +1135,14 @@ public class PlanningMonster : MonoBehaviour
                             Vector2 p4 = obsList[obs][obsPoly][obsEdg][1];
                             Vector2 v13 = p3 - p1;
                             Vector2 v14 = p4 - p1;
-                            float product1 = Vector2.Dot(v12p, v13) * Vector2.Dot(v12p, v14);
+                            //float product1 = Vector2.Dot(v12p, v13) * Vector2.Dot(v12p, v14);
+                            float product1 = (v12p.x * v13.x + v12p.y * v13.y) * (v12p.x * v14.x + v12p.y * v14.y);
                             Vector2 v34 = p4 - p3;
                             Vector2 v34p = new Vector2(v34.y, -v34.x);
                             Vector2 v31 = p1 - p3;
                             Vector2 v32 = p2 - p3;
-                            float product2 = Vector2.Dot(v34p, v31) * Vector2.Dot(v34p, v32);
+                            //float product2 = Vector2.Dot(v34p, v31) * Vector2.Dot(v34p, v32);
+                            float product2 = (v34p.x * v31.x + v34p.y * v31.y) * (v34p.x * v32.x + v34p.y * v32.y);
                             if (p1.x < 0 || p1.x >= backgroundSize || p1.y < 0 || p1.y >= backgroundSize ||
                             p2.x < 0 || p2.x >= backgroundSize || p2.y < 0 || p2.y >= backgroundSize)
                                 return true;
