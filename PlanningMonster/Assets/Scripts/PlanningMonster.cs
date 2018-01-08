@@ -1,5 +1,5 @@
 ﻿// Planning Monster: a motion planning project of GRA class
-// Weng, Wei-Chen 2018/01/07
+// Weng, Wei-Chen 2018/01/08
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -1048,6 +1048,7 @@ public class PlanningMonster : MonoBehaviour
 
     void obsListGenerate()
     {
+        obsList.Clear();
         // obstacle list
         for (int obs = 0; obs < obstacles.GetLength(0); obs++)
         {
